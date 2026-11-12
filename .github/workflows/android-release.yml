@@ -1,0 +1,101 @@
+name: Android APK
+
+# Builds the signed APK on every push. When package.json carries a version that has
+# no GitHub release yet, the APK is published as release v<version>.
+on:
+  push:
+    branches: [main, 'arena/**']
+    paths-ignore: ['**.md', 'legacy/**']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build web app
+        run: |
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Prepare signing key
+        id: sign
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "file=$RUNNER_TEMP/release.p12" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret - APK will be signed with the debug key."
+          fi
+
+      - name: Build APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ steps.sign.outputs.file }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify and name APK
+        id: apk
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          APK="FruitArcher-v$VERSION.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK"
+          "$BT/aapt2" dump badging "$APK" | head -5
+          sha256sum "$APK" | tee "$APK.sha256"
+          ls -lh "$APK"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "file=$APK" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.file }}
+          path: |
+            ${{ steps.apk.outputs.file }}
+            ${{ steps.apk.outputs.file }}.sha256
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.apk.outputs.version }}
+          APK: ${{ steps.apk.outputs.file }}
+        run: |
+          if [ ! -f .release-ready ]; then
+            echo "No .release-ready marker - build only."; exit 0
+          fi
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists - bump the version in package.json to publish a new one."
+            exit 0
+          fi
+          gh release create "v$VERSION" "$APK" "$APK.sha256" \
+            --target "$GITHUB_SHA" \
+            --title "Fruit Archer v$VERSION" \
+            --notes-file RELEASE_NOTES.md

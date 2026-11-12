@@ -1,0 +1,10 @@
+{
+  "appId": "com.tanish975.fruitarcher",
+  "appName": "Fruit Archer",
+  "webDir": "dist",
+  "backgroundColor": "#1b1036",
+  "android": { "backgroundColor": "#1b1036" },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 600, "launchAutoHide": true, "backgroundColor": "#1b1036", "showSpinner": false }
+  }
+}
