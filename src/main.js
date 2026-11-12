@@ -1,16 +1,14 @@
 // Fruit Archer — boot, screens, HUD and all menu logic.
 import '@fontsource/lilita-one';
-import '@fontsource-variable/nunito';
-import '@fontsource/baloo-2/devanagari-400.css';
-import '@fontsource/baloo-bhai-2/gujarati-400.css';
+import '@fontsource-variable/fredoka';
 import './style.css';
 import { animate, stagger } from 'animejs';
 import { Game } from './game.js';
 import { store } from './store.js';
 import { audio, sfx } from './audio.js';
 import { buzz, onBack, onAppPause, exitApp, isNative } from './platform.js';
-import { MODES, UPGRADES, upgradeCost, SKINS, MISSIONS, DAILY, POWERUPS, ARROWS, BOSSES, WORLDS, STAGES, WEEKLY, SEASON } from './data.js';
-import { t, LANGS, setLang, initLang, lang } from './i18n.js';
+import { MODES, UPGRADES, upgradeCost, SKINS, MISSIONS, DAILY, POWERUPS, ARROWS, BOSSES, WORLDS, STAGES, WEEKLY, SEASON, THEMES, DIFFS, diffById, stageById, ENDLESS_NAME } from './data.js';
+import { t } from './i18n.js';
 import { dayKey, ensurePeriods, weeklyList, totalStars, stageUnlocked, weekDaysLeft, seasonDaysLeft } from './meta.js';
 import { version } from '../package.json';
 
@@ -27,18 +25,18 @@ for (const p in urls) ICON[p.split('/').pop().replace('.png', '')] = urls[p];
 const icon = (name, cls = '') => `<img class="${cls}" src="${ICON[name] || ICON.star}" alt="" draggable="false" />`;
 let IMAGES = {};
 
-function loadImages() {
-  const out = {};
-  return Promise.all(Object.entries(ICON).map(([name, src]) => new Promise(res => {
+function loadImages(onProgress) {
+  const out = {}, all = Object.entries(ICON);
+  let done = 0;
+  return Promise.all(all.map(([name, src]) => new Promise(res => {
     const im = new Image();
-    im.onload = im.onerror = () => res();
+    im.onload = im.onerror = () => { onProgress(++done / all.length); res(); };
     im.src = src; out[name] = im;
   }))).then(() => out);
 }
 
 // ---------------------------------------------------------------- state
 store.load();
-initLang();
 ensurePeriods();
 const d = () => store.data;
 let game = null;
@@ -50,13 +48,14 @@ let lastResult = null;
 let busy = false; // a screen wipe is running
 
 const dailyPlayed = () => d().daily.chDate === dayKey();
+const diff = () => diffById(d().settings.diff);
+const worldName = st => (st.endless ? ENDLESS_NAME : WORLDS[st.world].name);
+const endlessCleared = () => Object.keys(d().stages).filter(id => +id > STAGES.length && d().stages[id] > 0).length;
 
 // ---------------------------------------------------------------- i18n
 function applyI18n() {
   $$('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
-  document.documentElement.dataset.lang = lang();
 }
-const canvasFont = () => document.fonts.load(`40px "${lang() === 'hi' ? 'Baloo 2' : lang() === 'gu' ? 'Baloo Bhai 2' : 'Lilita One'}"`, 'अ ગ A').catch(() => {});
 
 // ---------------------------------------------------------------- screens
 const SCREENS = ['home', 'map', 'shop', 'missions', 'stats', 'settings', 'pause', 'over', 'dialog'];
@@ -65,7 +64,7 @@ function show(id, opts = {}) {
   const from = current;
   for (const s of SCREENS) $('#' + s).hidden = s !== id;
   current = id;
-  const inGame = id === 'play' || id === 'pause';
+  const inGame = id === 'play' || id === 'pause' || (id === 'dialog' && game && game.state === 'offer');
   const hudEl = $('#hud');
   if (hudEl.hidden && inGame && !reduceMotion) {
     hudEl.hidden = false;
@@ -98,7 +97,7 @@ function render(id) {
   if (id === 'shop') renderShop();
   if (id === 'missions') renderMissions();
   if (id === 'stats') renderStats();
-  if (id === 'settings') { renderToggles($('#toggles')); renderLangs(); }
+  if (id === 'settings') renderSettings();
   if (id === 'pause') renderPause();
 }
 
@@ -186,6 +185,8 @@ function renderHome() {
   const n = claimable(), b = $('#missionBadge');
   b.hidden = !n; b.textContent = n;
   const s = d().season;
+  const df = diff();
+  $('#diffChip').style.setProperty('--c', df.color); $('#diffChipName').textContent = df.name;
   $('#seasonChip').textContent = s.tier;
   $('#seasonChipBar').style.transform = `scaleX(${s.tier >= SEASON.tiers ? 1 : (s.xp % SEASON.xpPerTier) / SEASON.xpPerTier})`;
 }
@@ -211,29 +212,44 @@ function pressPlay() {
 // ---------------------------------------------------------------- adventure map
 const starRow = (n, cls = '') => `<span class="stars ${cls}">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}">${icon('star')}</i>`).join('')}</span>`;
 
+function worldCard(wi, name, small, stages, got, open, next) {
+  return `<div class="card world rise w${wi} ${open ? '' : 'shut'}">
+    <div class="world-head"><div><small>${small}</small><h3>${name}</h3></div>
+      <div class="pill small">${icon('star')}<span>${got}</span></div></div>
+    <div class="nodes">${stages.map(s => {
+      const un = stageUnlocked(s.id), st = d().stages[s.id] || 0;
+      return `<button class="node ${un ? '' : 'locked'} ${s.boss >= 0 ? 'boss' : ''} ${next && next.id === s.id ? 'next' : ''}" data-stage="${s.id}">
+        ${s.boss >= 0 ? icon(BOSSES[s.boss].img, 'node-boss') : `<b>${s.id}</b>`}
+        ${un ? starRow(st, 'mini') : '<span class="padlock"></span>'}
+      </button>`;
+    }).join('')}</div>
+  </div>`;
+}
+
 function renderMap() {
   $('#mapStars').textContent = `${totalStars()}/120`;
-  const next = STAGES.find(s => stageUnlocked(s.id) && !d().stages[s.id]);
-  $('#mapList').innerHTML = WORLDS.map((w, wi) => {
+  let nextId = 1;
+  while (d().stages[nextId] > 0) nextId++;
+  const next = stageById(nextId);
+  let html = WORLDS.map((w, wi) => {
     const stages = STAGES.filter(s => s.world === wi);
     const got = stages.reduce((n, s) => n + (d().stages[s.id] || 0), 0);
-    const open = stageUnlocked(stages[0].id);
-    return `<div class="card world rise w${wi} ${open ? '' : 'shut'}">
-      <div class="world-head"><div><small>${t('world', { n: wi + 1 })}</small><h3>${w.name}</h3></div>
-        <div class="pill small">${icon('star')}<span>${got}/30</span></div></div>
-      <div class="nodes">${stages.map(s => {
-        const un = stageUnlocked(s.id), st = d().stages[s.id] || 0;
-        return `<button class="node ${un ? '' : 'locked'} ${s.boss >= 0 ? 'boss' : ''} ${next && next.id === s.id ? 'next' : ''}" data-stage="${s.id}">
-          ${s.boss >= 0 ? icon(BOSSES[s.boss].img, 'node-boss') : `<b>${s.id}</b>`}
-          ${un ? starRow(st, 'mini') : '<span class="padlock"></span>'}
-        </button>`;
-      }).join('')}</div>
-    </div>`;
+    return worldCard(wi, w.name, t('world', { n: wi + 1 }), stages, `${got}/30`, stageUnlocked(stages[0].id), next);
   }).join('');
+  // Endless Peaks: ten generated stages at a time, forever
+  const first = STAGES.length + 1 + Math.floor(Math.max(0, nextId - STAGES.length - 1) / 10) * 10;
+  const endless = Array.from({ length: 10 }, (_, i) => stageById(first + i));
+  html += worldCard(4, ENDLESS_NAME, t('endlessText', { n: endlessCleared() }), endless, endlessCleared(), stageUnlocked(STAGES.length + 1), next);
+  $('#mapList').innerHTML = html;
   requestAnimationFrame(() => $('.node.next')?.scrollIntoView({ block: 'center' }));
 }
 
-function limitText(s) { return s.time ? t('lim_time', { n: s.time + store.up('head') * 5 }) : t('lim_arrows', { n: s.arrows + store.up('head') * 2 }); }
+function limitText(s) { const df = diff(); return s.time ? t('lim_time', { n: Math.round(s.time * df.time) + store.up('head') * 5 }) : t('lim_arrows', { n: Math.round(s.arrows * df.arrows) + store.up('head') * 2 }); }
+
+function hintBox(s) {
+  if ((d().fails[s.id] || 0) < 2) return '';
+  return `<div class="hint rise">${icon('book')}<div><strong>${t('hintTitle')}</strong><small>${t('hint_' + s.goal)}</small>${diff().id !== 'easy' ? `<small>${t('hintDiff')}</small>` : ''}</div></div>`;
+}
 
 function arrowPicker() {
   const a = d().arrows;
@@ -242,18 +258,19 @@ function arrowPicker() {
 }
 
 function stageIntro(id) {
-  const s = STAGES.find(x => x.id === id);
+  const s = stageById(id);
   if (!stageUnlocked(id)) { sfx('deny'); buzz('error'); toast(t('stageLocked')); shake($(`[data-stage="${id}"]`)); return; }
   sfx('click');
   const goal = t('goal_' + s.goal, { n: fmt(s.n) });
-  const mods = s.mods.map(m => `<span class="tag">${t('mod_' + m)}</span>`).join('');
+  const mods = `<span class="tag" style="color:${diff().color}">${diff().name}</span>` + s.mods.map(m => `<span class="tag">${t('mod_' + m)}</span>`).join('');
   const have = d().stages[id] || 0;
   dialog(`
-    <p class="over-mode rise">${WORLDS[s.world].name}</p>
+    <p class="over-mode rise">${worldName(s)}</p>
     <h2 class="rise">${s.boss >= 0 ? BOSSES[s.boss].name : t('stage', { n: id })}</h2>
     ${s.boss >= 0 ? `<img class="boss-face rise" src="${ICON[BOSSES[s.boss].img]}" alt="" />` : ''}
     <div class="goal-box rise">${icon('target')}<div><strong>${goal}</strong><small>${limitText(s)}</small></div></div>
     <div class="tags rise">${mods}</div>
+    ${hintBox(s)}
     <div class="star-goals rise">
       <div>${starRow(1, 'mini')}<small>${t('starGoal')}</small></div>
       <div>${starRow(2, 'mini')}<small>${t('starPts', { n: fmt(s.stars[1]) })}</small></div>
@@ -413,6 +430,16 @@ function claimWeekly(id, btn) {
 }
 
 // ---------------------------------------------------------------- stats
+function trophies() {
+  const st = d().stages, list = [];
+  for (const m of MISSIONS) list.push({ icon: m.icon, name: m.name, how: t(m.id), on: (m.get(d().stats, d().best) || 0) >= m.goal });
+  BOSSES.forEach((b, i) => list.push({ icon: b.img, name: b.name, how: t('tr_boss', { n: b.name }), on: st[(i + 1) * 10] > 0 }));
+  WORLDS.forEach((w, i) => list.push({ icon: 'star', name: w.name, how: t('tr_world', { n: w.name }), on: STAGES.filter(s => s.world === i).every(s => st[s.id] === 3) }));
+  list.push({ icon: 'comet', name: ENDLESS_NAME, how: t('tr_endless'), on: endlessCleared() >= 10 });
+  list.push({ icon: 'party', name: 'Season Champion', how: t('tier', { n: SEASON.tiers }), on: d().season.tier >= SEASON.tiers });
+  return list;
+}
+
 function renderStats() {
   const s = d().stats, b = d().best;
   const acc = s.shots ? Math.min(100, Math.round((s.hits / s.shots) * 100)) + '%' : '-';
@@ -422,18 +449,29 @@ function renderStats() {
     ['bestCombo', fmt(s.bestCombo)], ['bigSkewer', s.bestSkewer ? 'x' + s.bestSkewer : '-'],
     ['bossesSmashed', fmt(s.bosses)], ['feversN', fmt(s.fevers)], ['coinsEarned', fmt(s.coinsEarned)],
   ].map(([k, v]) => `<div class="kv"><span>${t(k)}</span><b>${v}</b></div>`).join('');
-  $('#statList').innerHTML = `<div class="card rise"><h3>${t('highScores')}</h3><div class="stats3 four">${bests}</div></div><div class="card rise"><h3>${t('lifetime')}</h3>${rows}</div>`;
+  const tr = trophies(), have = tr.filter(x => x.on).length;
+  const shelf = `<div class="card rise"><h3>${t('trophies')}<span class="shelf-count">${have} / ${tr.length}</span></h3><div class="shelf">${tr.map((x, i) => `<button class="trophy ${x.on ? 'on' : 'off'}" data-trophy="${i}">${icon(x.icon)}</button>`).join('')}</div></div>`;
+  $('#statList').innerHTML = `${shelf}<div class="card rise"><h3>${t('highScores')}</h3><div class="stats3 four">${bests}</div></div><div class="card rise"><h3>${t('lifetime')}</h3>${rows}</div>`;
 }
 
 // ---------------------------------------------------------------- settings
 const TOGGLES = [['sfx', 'sfx'], ['music', 'music'], ['haptics', 'vibration']];
-function renderToggles(el) {
-  el.innerHTML = TOGGLES.map(([k, label]) => `
+const TOGGLES_MORE = [['lefty', 'lefty'], ['marks', 'marks']];
+const SENS = [[0.75, 'sens_low'], [1, 'sens_mid'], [1.35, 'sens_high']];
+const diffButtons = attr => DIFFS.map(x => `<button class="diff ${d().settings.diff === x.id ? 'on' : ''}" ${attr}="${x.id}" style="--c:${x.color}"><strong>${x.name}</strong><small>${x.desc}</small></button>`).join('');
+function renderSettings() {
+  const st = d().settings;
+  renderToggles($('#toggles'), [...TOGGLES, ...TOGGLES_MORE]);
+  $('#diffs').innerHTML = diffButtons('data-diff');
+  $('#sens').innerHTML = SENS.map(([v, k]) => `<button class="opt ${st.sens === v ? 'on' : ''}" data-sens="${v}">${t(k)}</button>`).join('');
+  $('#scenes').innerHTML = `<button class="scene ${st.scene === 'auto' ? 'on' : ''}" data-scene="auto"><span>A</span>${t('scene_auto')}</button>` +
+    THEMES.map((th, i) => `<button class="scene ${String(st.scene) === String(i) ? 'on' : ''}" data-scene="${i}"><span style="background:${th.sky[1]};border-bottom:12px solid ${th.hills[1]}"><i style="background:${th.sun}"></i></span>${t('scene_' + i)}</button>`).join('');
+}
+function applyScene() { game.themeIndex = -1; game.setTheme(1); }
+function renderToggles(el, list = TOGGLES) {
+  el.innerHTML = list.map(([k, label]) => `
     <button class="toggle ${d().settings[k] ? 'on' : ''}" data-toggle="${k}" role="switch" aria-checked="${d().settings[k]}">
       <span>${t(label)}</span><i></i></button>`).join('');
-}
-function renderLangs() {
-  $('#langs').innerHTML = LANGS.map(([code, name]) => `<button class="lang ${lang() === code ? 'on' : ''}" data-lang="${code}">${name}</button>`).join('');
 }
 function renderPause() {
   renderToggles($('#pauseToggles'));
@@ -456,7 +494,7 @@ function confirmReset() {
     <div class="row rise"><button class="btn btn-ghost" data-x="no">${t('cancel')}</button><button class="btn btn-danger" data-x="yes">${t('erase')}</button></div>`,
   (p, close) => {
     p.querySelector('[data-x=no]').onclick = () => { sfx('back'); close(); };
-    p.querySelector('[data-x=yes]').onclick = () => { store.reset(); ensurePeriods(); d().tutorialDone = true; store.save(); sfx('deny'); show('home'); toast(t('resetDone')); };
+    p.querySelector('[data-x=yes]').onclick = () => { const keep = d().settings.diff; store.reset(); ensurePeriods(); d().tutorialDone = true; d().settings.diff = keep; store.save(); document.body.classList.remove('lefty'); applyScene(); sfx('deny'); show('home'); toast(t('resetDone')); };
   });
 }
 
@@ -474,23 +512,65 @@ function backupDialog() {
       sfx('click'); toast(t('copied'));
     };
     p.querySelector('[data-x=restore]').onclick = () => {
-      const lng = lang();
       if (!box.value.trim() || !store.importCode(box.value)) { sfx('deny'); shake(box); toast(t('restoreBad')); return; }
-      if (!d().settings.lang) d().settings.lang = lng;
-      setLang(d().settings.lang); applyI18n(); ensurePeriods(); store.save();
+      ensurePeriods(); store.save(); document.body.classList.toggle('lefty', !!d().settings.lefty); applyScene();
       audio.syncMusic(); sfx('buy'); show('home'); toast(t('restoreOk'));
     };
   });
 }
 
 // ---------------------------------------------------------------- first run + daily bonus
+function nextIntro() {
+  if (!d().settings.diff) return diffDialog(nextIntro, true);
+  if (!d().tutorialDone && d().stats.games === 0) return welcome();
+  checkDaily();
+}
+
+function diffDialog(after, forced) {
+  dialog(`<h2 class="rise">${t('chooseDiff')}</h2><p class="rise dim">${t('chooseDiffText')}</p>
+    <div class="diffs rise">${diffButtons('data-pickdiff')}</div>
+    ${forced ? '' : `<button class="btn btn-ghost rise full" data-x="no">${t('cancel')}</button>`}`,
+  (p, close) => {
+    const no = p.querySelector('[data-x=no]'); if (no) no.onclick = () => { sfx('back'); close(); };
+    p.querySelectorAll('[data-pickdiff]').forEach(b => { b.onclick = () => {
+      d().settings.diff = b.dataset.pickdiff; store.save(); sfx('buy'); buzz('medium');
+      p.querySelectorAll('.diff').forEach(x => x.classList.toggle('on', x === b)); pop(b);
+      setTimeout(() => { show('home', { quiet: true }); pop($('#diffChip')); if (after) after(); }, reduceMotion ? 0 : 320);
+    }; });
+  });
+}
+
+let offerTimer = null;
+function onOffer(o) {
+  const gain = t('cont_' + o.rule), poor = d().coins < o.cost;
+  dialog(`<img class="offer-ico rise" src="${ICON[o.rule === 'time' ? 'hourglass' : o.rule === 'lives' ? 'heart' : 'bow']}" alt="" />
+    <h2 class="rise">${t('contTitle')}</h2>
+    ${o.n ? `<p class="rise dim">${t('contGoal', { n: `${fmt(o.cur)} / ${fmt(o.n)}` })}</p>` : ''}
+    <div class="offer-gain rise">${gain}</div>
+    <div class="countdown rise"><div id="offerBar"></div></div>
+    <button class="btn btn-play rise ${poor ? 'poor' : ''}" data-x="ok">${icon('coin')} ${fmt(o.cost)}</button>
+    <button class="btn btn-ghost rise full" data-x="no">${t('contNo')}</button>`,
+  (p) => {
+    const done = fn => { if (offerTimer) offerTimer.pause(); offerTimer = null; show('play'); fn(); };
+    const no = () => done(() => game.giveUp());
+    p.querySelector('[data-x=no]').onclick = () => { sfx('back'); no(); };
+    p.querySelector('[data-x=ok]').onclick = e => {
+      if (game.state !== 'offer') return;
+      if (d().coins < o.cost) return deny(e.currentTarget, o.cost);
+      d().coins -= o.cost; store.save(); sfx('buy');
+      done(() => game.revive());
+    };
+    offerTimer = animate('#offerBar', { scaleX: [1, 0], duration: 7000, ease: 'linear', onComplete: () => { if (current === 'dialog' && game.state === 'offer') no(); } });
+  });
+}
+
 function welcome() {
   dialog(`<img class="hero rise" src="${ICON.bow}" alt="" /><h2 class="rise">${t('welcome')}</h2><p class="rise dim">${t('welcomeText')}</p>
     <button class="btn btn-play rise" data-x="ok">${t('startTut')}</button>
     <button class="btn btn-ghost rise full" data-x="no">${t('skip')}</button>`,
   (p) => {
     p.querySelector('[data-x=ok]').onclick = () => { buzz('medium'); startGame('tutorial'); };
-    p.querySelector('[data-x=no]').onclick = () => { sfx('back'); d().tutorialDone = true; store.save(); show('home'); checkDaily(); };
+    p.querySelector('[data-x=no]').onclick = () => { sfx('back'); d().tutorialDone = true; store.save(); show('home', { quiet: true }); checkDaily(); };
   });
 }
 
@@ -614,9 +694,43 @@ function pulse(el, s) {
 // ---------------------------------------------------------------- game over
 function onGameOver(r) {
   lastResult = r;
+  if (r.stage) { d().fails[r.stage.id] = r.won ? 0 : (d().fails[r.stage.id] || 0) + 1; store.save(); }
+  const kind = r.stage ? (r.won ? (r.stage.boss >= 0 ? 'boss' : r.stars === 3 ? 'perfect' : 'clear') : '') : r.isBest ? 'best' : '';
+  if (kind && !reduceMotion) cheer(kind).then(() => showOver(r)); else showOver(r);
+}
+
+/** Full-screen celebration: spinning rays, a bouncing banner and a confetti burst. */
+function cheer(kind) {
+  const el = $('#cheer'), word = t('cheer_' + kind);
+  $('#cheerIco').src = ICON[{ boss: 'crown', perfect: 'star', clear: 'party', best: 'trophy' }[kind]];
+  $('#cheerSmall').textContent = kind === 'clear' ? '' : t('congrats');
+  $('#cheerWord').innerHTML = [...word].map(c => `<b>${c}</b>`).join('');
+  if (!$('#rays').children.length) $('#rays').innerHTML = Array.from({ length: 12 }, (_, i) => `<i style="transform:rotate(${i * 30}deg)"></i>`).join('');
+  el.classList.add('on');
+  sfx(kind === 'clear' ? 'star' : 'best'); buzz('success');
+  animate(el, { opacity: [0, 1], duration: 180, ease: 'outQuad' });
+  animate('#rays', { scale: [0.2, 1], duration: 600, ease: 'outQuint' });
+  animate('#cheerIco', { scale: [0.2, 1], rotate: [-40, 0], duration: 620, ease: 'outElastic(1, .55)' });
+  animate('#cheerSmall', { opacity: [0, 1], translateY: [14, 0], duration: 300, delay: 160, ease: 'outQuint' });
+  animate('#cheerWord b', { translateY: [50, 0], scale: [0.3, 1], opacity: [0, 1], duration: 520, delay: stagger(38, { start: 220 }), ease: 'outBack' });
+  const colors = ['#ff5470', '#ffd23f', '#a6f06a', '#5ce1ff', '#c77dff', '#ff8a1f'], w = innerWidth, h = innerHeight;
+  for (let i = 0; i < 46; i++) {
+    const b = document.createElement('i'); b.className = 'bit'; b.style.background = colors[i % colors.length];
+    el.appendChild(b);
+    const side = i % 2 ? -1 : 1, x0 = side > 0 ? -10 : w + 10, peak = (0.15 + Math.random() * 0.45) * w * side;
+    animate(b, {
+      translateX: [x0, x0 + peak, x0 + peak * (1.2 + Math.random() * 0.5)], translateY: [h * 0.62, h * (0.1 + Math.random() * 0.3), h * 1.05],
+      rotate: [0, (Math.random() - 0.5) * 1400], scaleX: [1, 0.3, 1, 0.4, 1], duration: 1500 + Math.random() * 600, delay: 150 + Math.random() * 250, ease: 'outQuad',
+      onComplete: () => b.remove(),
+    });
+  }
+  return sleep(1750).then(() => animate(el, { opacity: [1, 0], duration: 220, ease: 'inQuad' }).then()).then(() => { el.classList.remove('on'); el.style.opacity = ''; });
+}
+
+function showOver(r) {
   document.body.classList.remove('fever-on');
   const st = r.stage;
-  $('#overMode').textContent = st ? `${WORLDS[st.world].name} · ${t('stage', { n: st.id })}` : r.mode === 'daily' ? t('dailyTitle') : t('mode_' + r.mode);
+  $('#overMode').textContent = st ? `${worldName(st)} · ${t('stage', { n: st.id })}` : r.mode === 'daily' ? t('dailyTitle') : t('mode_' + r.mode);
   $('#bestRibbon').hidden = !r.isBest;
   const starsEl = $('#overStars');
   starsEl.hidden = !st;
@@ -629,16 +743,17 @@ function onGameOver(r) {
   $('#overSeason').innerHTML = `${icon('gift')}<div class="bar"><div id="overXpBar" style="transform:scaleX(0)"></div><span>${t('tier', { n: s.tier })} · ${t('seasonXp', { n: r.season.xp })}</span></div>`;
   const n = claimable(), note = $('#overNote');
   note.hidden = !n; note.innerHTML = n ? `${icon('trophy')} ${t('missionReady', { n })}` : '';
+  $('#overHint').innerHTML = st && !r.won ? hintBox(st) : '';
   $('#overScore').textContent = '0'; $('#overCoins').textContent = '+0';
 
-  const nextStage = st && r.won ? STAGES.find(x => x.id === st.id + 1) : null;
+  const nextStage = st && r.won ? stageById(st.id + 1) : null;
   const again = $('#againBtn');
   again.hidden = r.mode === 'daily';
   again.textContent = st ? (nextStage ? t('next') : r.won ? t('map') : t('retry')) : t('playAgain');
   again.onclick = () => {
     sfx('click'); buzz('medium');
     if (!st) return startGame(r.mode);
-    if (nextStage) { game.toMenu(); show('map', { quiet: true }); return stageIntro(nextStage.id); }
+    if (nextStage) { game.toMenu(); current = 'map'; return stageIntro(nextStage.id); }
     if (r.won) { game.toMenu(); return show('map'); }
     startGame('stage', st);
   };
@@ -688,20 +803,20 @@ function onTutorialDone() {
 function shareCanvas(r) {
   const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
   const x = c.getContext('2d');
-  const g = x.createLinearGradient(0, 0, 0, 1080);
-  g.addColorStop(0, '#2a1560'); g.addColorStop(0.55, '#b83b7c'); g.addColorStop(1, '#ff9b4a');
-  x.fillStyle = g; x.fillRect(0, 0, 1080, 1080);
+  x.fillStyle = '#8f3a78'; x.fillRect(0, 0, 1080, 1080);
+  x.fillStyle = '#ff9b4a'; x.fillRect(0, 760, 1080, 320);
+  x.fillStyle = '#4a2a73'; x.beginPath(); x.moveTo(0, 1080); for (let i = 0; i <= 1080; i += 20) x.lineTo(i, 900 + Math.sin(i * 0.008) * 40); x.lineTo(1080, 1080); x.fill();
   x.fillStyle = 'rgba(27,16,54,0.55)'; x.beginPath(); x.roundRect(70, 330, 940, 560, 60); x.fill();
   const fruit = ['apple', 'orange', 'watermelon', 'grapes', 'strawberry', 'pineapple', 'kiwi', 'lemon'];
   fruit.forEach((f, i) => { const im = IMAGES[f]; if (im && im.width) { x.save(); x.translate(100 + i * 126, 960 + (i % 2) * 30); x.rotate((i - 4) * 0.12); x.drawImage(im, -60, -60, 120, 120); x.restore(); } });
   const text = (s, y, size, color, stroke = 14) => {
-    x.font = `${size}px "Lilita One", "Baloo 2", "Baloo Bhai 2", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = `${size}px "Lilita One", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.lineJoin = 'round'; x.lineWidth = stroke; x.strokeStyle = '#1b1036'; x.strokeText(s, 540, y); x.fillStyle = color; x.fillText(s, 540, y);
   };
   x.save(); x.translate(540, 180); x.rotate(-0.06); x.translate(-540, -180);
   text('FRUIT', 130, 150, '#ff5470', 24); text('ARCHER', 255, 128, '#ffd23f', 24); x.restore();
   const st = r.stage;
-  text(st ? `${WORLDS[st.world].name} · ${t('stage', { n: st.id })}` : r.mode === 'daily' ? `${t('dailyTitle')} ${dayKey()}` : t('mode_' + r.mode), 410, 52, '#e2d9ff', 10);
+  text(st ? `${worldName(st)} · ${t('stage', { n: st.id })}` : r.mode === 'daily' ? `${t('dailyTitle')} ${dayKey()}` : t('mode_' + r.mode), 410, 52, '#e2d9ff', 10);
   text(fmt(r.score), 560, 230, '#ffd23f', 26);
   if (st) {
     const im = IMAGES.star;
@@ -792,18 +907,20 @@ document.addEventListener('click', e => {
   else if (ds.buyarrow) buyOrEquip('arrows', ARROWS, ds.buyarrow, b);
   else if (ds.claim) claimMission(ds.claim, b);
   else if (ds.wclaim) claimWeekly(ds.wclaim, b);
-  else if (ds.lang) {
-    d().settings.lang = ds.lang; store.save(); setLang(ds.lang); applyI18n(); sfx('click'); buzz('light');
-    canvasFont(); show('settings');
-  }
+  else if (ds.diff) { d().settings.diff = ds.diff; store.save(); sfx('click'); buzz('light'); renderSettings(); pop($(`[data-diff="${ds.diff}"]`)); }
+  else if (ds.sens) { d().settings.sens = +ds.sens; store.save(); sfx('click'); renderSettings(); }
+  else if (ds.scene) { d().settings.scene = ds.scene; store.save(); sfx('whoosh'); renderSettings(); applyScene(); pop($(`[data-scene="${ds.scene}"]`)); }
+  else if (ds.trophy) { const x = trophies()[+ds.trophy]; sfx(x.on ? 'star' : 'click'); toast(`${icon(x.icon)} ${x.on ? `${x.name}: ${x.how}` : t('trophyLocked', { n: x.how })}`); }
   else if (ds.toggle) {
     const s = d().settings; s[ds.toggle] = !s[ds.toggle]; store.save();
+    if (ds.toggle === 'lefty') document.body.classList.toggle('lefty', s.lefty);
     b.classList.toggle('on', s[ds.toggle]); b.setAttribute('aria-checked', s[ds.toggle]);
     audio.syncMusic(); sfx('click'); if (ds.toggle === 'haptics') buzz('medium');
   }
 });
 
 $('#playBtn').onclick = pressPlay;
+$('#diffChip').onclick = () => { sfx('click'); diffDialog(null, false); };
 $('#pauseBtn').onclick = () => { if (current === 'play') goBack(); };
 $('#resumeBtn').onclick = resume;
 $('#restartBtn').onclick = () => { sfx('click'); startGame(game.mode, game.stage); };
@@ -829,18 +946,33 @@ $$('img[data-icon]').forEach(i => { i.src = ICON[i.dataset.icon]; i.draggable = 
 applyI18n();
 buildLogo();
 
+document.body.classList.toggle('lefty', !!d().settings.lefty);
+const bootT0 = performance.now();
+const bootBar = p => { $('#bootFill').style.transform = `scaleX(${p})`; $('#bootArrow').style.transform = `translateX(${p * 100}%)`; };
+$$('#boot .b-logo span').forEach(sp => { sp.innerHTML = [...sp.textContent].map(c => `<b>${c}</b>`).join(''); });
+if (!reduceMotion) animate('#boot .b-logo b', { translateY: [-70, 0], rotate: [() => (Math.random() - 0.5) * 60, 0], opacity: [0, 1], duration: 650, delay: stagger(50), ease: 'outElastic(1, .6)' });
+
 Promise.all([
-  loadImages(),
+  loadImages(p => bootBar(p * 0.9)),
   document.fonts.load('40px "Lilita One"').catch(() => {}),
-  canvasFont(),
-]).then(([images]) => {
+]).then(async ([images]) => {
   IMAGES = images;
-  game = new Game($('#game'), images, { onGameOver, onTutorialDone, onFrame: g => hud.update(g) });
+  game = new Game($('#game'), images, { onGameOver, onTutorialDone, onOffer, onFrame: g => hud.update(g) });
   game.toMenu();
-  show('home');
-  logoIn();
-  if (!d().tutorialDone && d().stats.games === 0) welcome(); else checkDaily();
-  document.body.classList.add('ready');
-  if (isNative) import('@capacitor/splash-screen').then(m => m.SplashScreen.hide()).catch(() => {});
   if (import.meta.env.DEV) { window.__game = game; window.__store = store; }
+  if (isNative) import('@capacitor/splash-screen').then(m => m.SplashScreen.hide()).catch(() => {});
+  bootBar(1);
+  await sleep(Math.max(350, (reduceMotion ? 500 : 1500) - (performance.now() - bootT0)));
+  show('home');
+  const boot = $('#boot');
+  if (reduceMotion) boot.remove();
+  else {
+    sfx('whoosh');
+    animate('#boot .b-track, #boot .b-text', { opacity: 0, duration: 160 });
+    animate('#boot .b-logo', { scale: [1, 1.25], opacity: [1, 0], duration: 380, ease: 'inQuad' });
+    await animate(boot, { opacity: [1, 0], duration: 420, delay: 140, ease: 'inQuad' }).then();
+    boot.remove();
+    logoIn();
+  }
+  nextIntro();
 });

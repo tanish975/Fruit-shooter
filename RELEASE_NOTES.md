@@ -1,30 +1,29 @@
-# Fruit Archer v9.0.0 — Adventure update
+# Fruit Archer v10.0.1
 
-Install `FruitArcher-v9.0.0.apk` on Android 7.0 or newer. If v8 is installed, uninstall it first (builds are signed with a per-build debug key until signing secrets are added to the repo), so v8 progress does not carry over.
+Install `FruitArcher-v10.0.1.apk` on Android 7.0 or newer. If an earlier version is installed, uninstall it first (builds use a per-build debug key until signing secrets are added). To keep your progress, copy a backup code from Settings → Backup & restore before uninstalling and paste it in afterwards.
 
-## New ways to play
-- **Adventure**: 40 hand-shaped stages in 4 worlds, each with a goal (fruit count, score, perfect hits, skewers, combo, or a boss) and up to 3 stars. Stage layouts are seeded, so a stage plays the same on every attempt.
-- **4 bosses** with their own tricks: King Pumpkin (bombs), Coco Golem (orbiting shields), Melon Queen (dashes), Storm King (bomb storm and wind).
-- **Daily Challenge**: one seeded run per day, the same fruit for everyone, one attempt.
-- **Guided training** on first launch (replayable from Settings), +100 coins the first time.
+The game stays in portrait: it is played one-handed with a thumb drag, and fruit flies upward, so a tall screen gives the most room to aim.
 
-## New things to shoot (and not shoot)
-- Balloon-carried fruit, shielded fruit, fruit that dodges, wind that bends arrows, and birds you must not hit.
-- **5 arrow types** with trade-offs: Classic, Blast, Frost, Splitter, Ricochet. Pick one before each stage.
+## Difficulty
+- Choose **Easy, Moderate, Hard or Intense** on first launch, from the chip on the home screen, or in Settings.
+- Difficulty changes fruit speed, wave spacing, bomb frequency, time/arrow/life limits, the length of the aiming guide, hit forgiveness, boss health and how early hazards appear. Hard scores count 1.3x and Intense 1.7x.
+- The Daily Challenge and training always run on Moderate.
 
-## Long-term goals
-- Weekly missions (3 drawn each week), 14 career missions, a monthly 20-tier season track with an exclusive Harvest Moon bow.
-- Share your score as an image. Backup and restore progress with a code.
+## Look and feel
+- **Four illustrated sceneries** (day, sunset, night, dawn) drawn in flat colours with mountains, hills and orchards. Pick one in Settings → Scenery or leave it on Auto. The photo backdrops from v10.0.0 were removed.
+- **Flat colours**: gradients were removed from the interface.
+- **New loading screen**: the logo drops in while an arrow flies along the progress bar.
+- **Celebrations**: spinning rays, a bouncing banner and confetti for stage clears, 3-star runs, boss kills and new best scores.
+- Body text is now set in Fredoka; headings stay in Lilita One.
 
-## Feel
-- A drawn archer who aims, breathes and blinks; arrows stick in the ground; confetti, leaves, fireflies and wind streaks.
-- Screen wipes between menus and play, coins that fly to your purse, star pops, button ripples, animated logo, fever glow. All respect the system "reduce motion" setting.
-- New sounds: bow creak, string twang, balloon pop, star chime and more.
-
-## Languages
-- English, Hindi and Gujarati (Settings → Language).
+## New features
+- **Continue offer**: once per run, a failed stage or Survival run can be continued for coins (+15 seconds, +5 arrows or +1 life).
+- **Archer's tips**: after two fails on the same stage, the stage card and result screen show a hint for that goal.
+- **Trophy shelf** in Stats: 24 trophies for missions, bosses, perfect worlds, Endless Peaks and the season.
+- **Endless Peaks**: generated stages that continue after stage 40, ten at a time.
+- **Left-handed layout** and **aim sensitivity** (Low / Normal / High) in Settings.
+- **Hazard markers**: an optional ring-and-cross outline on bombs and birds that does not rely on colour.
 
 ## Known limits
-- Not yet tested on a physical phone; stage difficulty and coin economy have not been tuned from real play sessions.
-- Hindi and Gujarati text has not been reviewed by a second reader.
-- No online leaderboards or cloud save: the daily challenge and backup code are local only.
+- Not tested on a physical phone. Difficulty levels, the continue price and Endless Peaks scaling are untuned estimates.
+- See `ROADMAP.md` for what is deliberately parked (signing, balance pass, online leaderboard, Play Store).

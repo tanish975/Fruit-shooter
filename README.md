@@ -24,13 +24,16 @@ A portrait, one-thumb archery arcade game for Android. Pull back, aim, and skewe
 
 ## What's in the game
 
+- Four difficulty levels: Easy, Moderate, Hard, Intense
 - 15 fruits, golden stars and gems, balloons, shields, dodging fruit, wind, and birds to avoid
-- 4 bosses: King Pumpkin, Coco Golem, Melon Queen, Storm King
-- 5 arrow types (Classic, Blast, Frost, Splitter, Ricochet) and 5 timed power-ups
-- Coins, 7 upgrades, 6 bow skins, weekly and career missions, a monthly season track, daily bonus streak
+- 4 bosses, then Endless Peaks: generated stages after stage 40
+- 5 arrow types and 5 timed power-ups
+- Coins, 7 upgrades, 6 bow skins, weekly and career missions, a monthly season track, daily bonus streak, trophy shelf
+- One continue per run for coins, and hints after repeated fails
+- Four flat-colour illustrated sceneries, selectable or automatic
 - Guided training, score sharing as an image, backup and restore by code
-- English, Hindi and Gujarati
-- Haptics, synthesised sound and music, full-screen, back-button and app-switch pause, reduced-motion support
+- Left-handed layout, aim sensitivity, hazard markers, reduced-motion support
+- Haptics, synthesised sound and music, full-screen, back-button and app-switch pause
 
 ## Privacy
 
@@ -40,7 +43,7 @@ The game works fully offline. It has no accounts, ads, analytics or network call
 
 - Fruit and icon art: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT)
 - Animation: [anime.js](https://github.com/juliangarnier/anime) (MIT)
-- Fonts: Lilita One, Nunito, Baloo 2, Baloo Bhai 2 (SIL OFL) via Fontsource
+- Fonts: Lilita One, Fredoka (SIL OFL) via Fontsource
 - Native shell: [Capacitor](https://capacitorjs.com)
 
 ## Development
@@ -80,6 +83,6 @@ install in place, add three repository secrets (Settings → Secrets and variabl
 | `src/audio.js` | WebAudio sound effects and generative music |
 | `src/platform.js` | Capacitor bridge: haptics, back button, app pause |
 | `android/` | Capacitor Android project |
-| `src/i18n.js` | English, Hindi and Gujarati strings |
+| `src/i18n.js` | all player-facing text |
 | `src/meta.js` | weekly missions, season track, daily challenge bookkeeping |
 | `legacy/` | the original v7 browser game, kept for reference |
