@@ -80,11 +80,6 @@ install in place, add three repository secrets (Settings → Secrets and variabl
 | `src/audio.js` | WebAudio sound effects and generative music |
 | `src/platform.js` | Capacitor bridge: haptics, back button, app pause |
 | `android/` | Capacitor Android project |
+| `src/i18n.js` | English, Hindi and Gujarati strings |
+| `src/meta.js` | weekly missions, season track, daily challenge bookkeeping |
 | `legacy/` | the original v7 browser game, kept for reference |
-
-## Credits
-
-- Fruit and icon art: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT)
-- UI motion: [anime.js](https://github.com/juliangarnier/anime) (MIT)
-- Native shell: [Capacitor](https://capacitorjs.com) (MIT)
-- Fonts: Lilita One and Nunito (SIL Open Font License)
