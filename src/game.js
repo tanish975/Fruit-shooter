@@ -108,21 +108,16 @@ export class Game {
   paintBackground(cv, th) {
     cv.width = this.canvas.width; cv.height = this.canvas.height;
     const c = cv.getContext('2d'), { W, H } = this;
-    const photo = this.img['bg_' + th.name];
-    if (photo && photo.width) {
-      // cover the screen, anchored to the bottom so the meadow always sits under the archer
-      const s = Math.max(cv.width / photo.width, cv.height / photo.height), w = photo.width * s, h = photo.height * s;
-      c.setTransform(1, 0, 0, 1, 0, 0);
-      c.drawImage(photo, (cv.width - w) / 2, cv.height - h, w, h);
-      c.globalAlpha = th.name === 'night' ? 0 : 0.08; c.fillStyle = '#1b1036'; c.fillRect(0, 0, cv.width, cv.height); c.globalAlpha = 1;
-      this.photoBg = true;
-      return;
-    }
-    this.photoBg = false;
     c.setTransform(this.scale * this.dpr, 0, 0, this.scale * this.dpr, 0, 0);
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    c.fillStyle = th.sky[1]; c.fillRect(0, 0, W, H);
+    // flat-colour sky: three solid bands with soft wavy edges, no gradients
+    c.fillStyle = th.sky[0]; c.fillRect(0, 0, W, H);
+    [[0.3, th.sky[1], 0.9], [0.5, th.sky[2], 2.6]].forEach(([top, col, ph]) => {
+      c.fillStyle = col; c.beginPath(); c.moveTo(0, H);
+      for (let x = 0; x <= W + 10; x += 10) c.lineTo(x, H * top + Math.sin(x * 0.012 + ph) * 12 + Math.sin(x * 0.031 + ph * 3) * 5);
+      c.lineTo(W, H); c.closePath(); c.fill();
+    });
     if (th.stars) {
       c.fillStyle = '#fff';
       for (let i = 0; i < 90; i++) {
@@ -132,8 +127,22 @@ export class Game {
       c.globalAlpha = 1;
     }
     const sx = W * 0.74, sy = H * th.sunY;
-    c.fillStyle = th.sun; c.beginPath(); c.arc(sx, sy, 38, 0, TAU); c.fill();
+    c.fillStyle = th.sun;
+    c.globalAlpha = 0.14; c.beginPath(); c.arc(sx, sy, 92, 0, TAU); c.fill();
+    c.globalAlpha = 0.22; c.beginPath(); c.arc(sx, sy, 62, 0, TAU); c.fill();
+    c.globalAlpha = 1; c.beginPath(); c.arc(sx, sy, 38, 0, TAU); c.fill();
     if (th.name === 'night') { c.fillStyle = th.sky[0]; c.globalAlpha = 0.9; c.beginPath(); c.arc(sx + 15, sy - 9, 32, 0, TAU); c.fill(); c.globalAlpha = 1; }
+    // far mountain range in two flat tones
+    [[0.56, 70, 0.4, 0.5], [0.6, 46, 0.6, 3.3]].forEach(([base, amp, alpha, ph]) => {
+      c.globalAlpha = alpha; c.fillStyle = th.hills[2];
+      c.beginPath(); c.moveTo(0, H);
+      for (let x = 0; x <= W + 6; x += 6) {
+        const u = x * 0.018 + ph, tri = Math.abs(((u % 2) + 2) % 2 - 1); // sharp peaks
+        c.lineTo(x, H * base - tri * amp - Math.abs(Math.sin(u * 2.7)) * amp * 0.3);
+      }
+      c.lineTo(W, H); c.closePath(); c.fill();
+    });
+    c.globalAlpha = 1;
     // rolling orchard hills, back to front
     const layers = [[0.6, 26, 0.012, 0.6], [0.69, 22, 0.017, 2.4], [0.79, 18, 0.021, 4.1]];
     layers.forEach(([base, amp, freq, ph], li) => {
@@ -979,7 +988,7 @@ export class Game {
 
     // clouds
     c.fillStyle = th.cloud;
-    for (const cl of this.photoBg ? [] : this.clouds) {
+    for (const cl of this.clouds) {
       const x = cl.x * W, y = cl.y * H, s = cl.s;
       c.beginPath();
       c.ellipse(x, y, 46 * s, 15 * s, 0, 0, TAU); c.ellipse(x - 20 * s, y - 9 * s, 22 * s, 15 * s, 0, 0, TAU); c.ellipse(x + 14 * s, y - 13 * s, 26 * s, 19 * s, 0, 0, TAU);

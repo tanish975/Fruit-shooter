@@ -30,7 +30,7 @@ A portrait, one-thumb archery arcade game for Android. Pull back, aim, and skewe
 - 5 arrow types and 5 timed power-ups
 - Coins, 7 upgrades, 6 bow skins, weekly and career missions, a monthly season track, daily bonus streak, trophy shelf
 - One continue per run for coins, and hints after repeated fails
-- Four photo-real backdrops, selectable or automatic
+- Four flat-colour illustrated sceneries, selectable or automatic
 - Guided training, score sharing as an image, backup and restore by code
 - Left-handed layout, aim sensitivity, hazard markers, reduced-motion support
 - Haptics, synthesised sound and music, full-screen, back-button and app-switch pause
@@ -44,7 +44,6 @@ The game works fully offline. It has no accounts, ads, analytics or network call
 - Fruit and icon art: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT)
 - Animation: [anime.js](https://github.com/juliangarnier/anime) (MIT)
 - Fonts: Lilita One, Fredoka (SIL OFL) via Fontsource
-- Backdrops: AI-generated images made for this project
 - Native shell: [Capacitor](https://capacitorjs.com)
 
 ## Development

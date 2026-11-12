@@ -418,6 +418,8 @@ body.fever-on #hud::before { content: ''; position: absolute; inset: 0; pointer-
 .scene { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 2px 5px; border-radius: 12px; border: 2px solid transparent; background: rgba(0, 0, 0, 0.28); font-size: 11.5px; }
 .scene span { width: 100%; aspect-ratio: 1 / 1.25; border-radius: 8px; background: #3b2a78 center bottom / cover; display: grid; place-items: center; font: 400 17px var(--display); }
 .scene.on { border-color: var(--lime); }
+.scene span { box-sizing: border-box; position: relative; }
+.scene span i { position: absolute; right: 18%; top: 18%; width: 30%; aspect-ratio: 1; border-radius: 50%; }
 
 /* hints + continue offer */
 .btn-play img { width: 34px; height: 34px; }

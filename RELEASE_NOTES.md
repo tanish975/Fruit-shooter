@@ -1,6 +1,8 @@
-# Fruit Archer v10.0.0
+# Fruit Archer v10.0.1
 
-Install `FruitArcher-v10.0.0.apk` on Android 7.0 or newer. If an earlier version is installed, uninstall it first (builds use a per-build debug key until signing secrets are added). To keep your progress, copy a backup code from Settings → Backup & restore before uninstalling and paste it in afterwards.
+Install `FruitArcher-v10.0.1.apk` on Android 7.0 or newer. If an earlier version is installed, uninstall it first (builds use a per-build debug key until signing secrets are added). To keep your progress, copy a backup code from Settings → Backup & restore before uninstalling and paste it in afterwards.
+
+The game stays in portrait: it is played one-handed with a thumb drag, and fruit flies upward, so a tall screen gives the most room to aim.
 
 ## Difficulty
 - Choose **Easy, Moderate, Hard or Intense** on first launch, from the chip on the home screen, or in Settings.
@@ -8,7 +10,7 @@ Install `FruitArcher-v10.0.0.apk` on Android 7.0 or newer. If an earlier version
 - The Daily Challenge and training always run on Moderate.
 
 ## Look and feel
-- **Photo-real scenery**: four backdrops (day orchard, sunset, moonlit night, mountain dawn). Pick one in Settings → Scenery or leave it on Auto.
+- **Four illustrated sceneries** (day, sunset, night, dawn) drawn in flat colours with mountains, hills and orchards. Pick one in Settings → Scenery or leave it on Auto. The photo backdrops from v10.0.0 were removed.
 - **Flat colours**: gradients were removed from the interface.
 - **New loading screen**: the logo drops in while an arrow flies along the progress bar.
 - **Celebrations**: spinning rays, a bouncing banner and confetti for stage clears, 3-star runs, boss kills and new best scores.
@@ -24,5 +26,4 @@ Install `FruitArcher-v10.0.0.apk` on Android 7.0 or newer. If an earlier version
 
 ## Known limits
 - Not tested on a physical phone. Difficulty levels, the continue price and Endless Peaks scaling are untuned estimates.
-- The backdrops are AI-generated images.
 - See `ROADMAP.md` for what is deliberately parked (signing, balance pass, online leaderboard, Play Store).

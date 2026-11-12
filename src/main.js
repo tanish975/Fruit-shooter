@@ -25,12 +25,8 @@ for (const p in urls) ICON[p.split('/').pop().replace('.png', '')] = urls[p];
 const icon = (name, cls = '') => `<img class="${cls}" src="${ICON[name] || ICON.star}" alt="" draggable="false" />`;
 let IMAGES = {};
 
-const bgUrls = import.meta.glob('./assets/bg/*.jpg', { eager: true, query: '?url', import: 'default' });
-const BG = {};
-for (const p in bgUrls) BG['bg_' + p.split('/').pop().replace('.jpg', '')] = bgUrls[p];
-
 function loadImages(onProgress) {
-  const out = {}, all = Object.entries({ ...ICON, ...BG });
+  const out = {}, all = Object.entries(ICON);
   let done = 0;
   return Promise.all(all.map(([name, src]) => new Promise(res => {
     const im = new Image();
@@ -469,7 +465,7 @@ function renderSettings() {
   $('#diffs').innerHTML = diffButtons('data-diff');
   $('#sens').innerHTML = SENS.map(([v, k]) => `<button class="opt ${st.sens === v ? 'on' : ''}" data-sens="${v}">${t(k)}</button>`).join('');
   $('#scenes').innerHTML = `<button class="scene ${st.scene === 'auto' ? 'on' : ''}" data-scene="auto"><span>A</span>${t('scene_auto')}</button>` +
-    THEMES.map((th, i) => `<button class="scene ${String(st.scene) === String(i) ? 'on' : ''}" data-scene="${i}"><span style="background-image:url(${BG['bg_' + th.name]})"></span>${t('scene_' + i)}</button>`).join('');
+    THEMES.map((th, i) => `<button class="scene ${String(st.scene) === String(i) ? 'on' : ''}" data-scene="${i}"><span style="background:${th.sky[1]};border-bottom:12px solid ${th.hills[1]}"><i style="background:${th.sun}"></i></span>${t('scene_' + i)}</button>`).join('');
 }
 function applyScene() { game.themeIndex = -1; game.setTheme(1); }
 function renderToggles(el, list = TOGGLES) {
@@ -807,9 +803,9 @@ function onTutorialDone() {
 function shareCanvas(r) {
   const c = document.createElement('canvas'); c.width = 1080; c.height = 1080;
   const x = c.getContext('2d');
-  x.fillStyle = '#7a2f6b'; x.fillRect(0, 0, 1080, 1080);
-  const bg = IMAGES.bg_dusk;
-  if (bg && bg.width) { const k = 1080 / bg.width; x.drawImage(bg, 0, 1080 - bg.height * k + 120, 1080, bg.height * k); }
+  x.fillStyle = '#8f3a78'; x.fillRect(0, 0, 1080, 1080);
+  x.fillStyle = '#ff9b4a'; x.fillRect(0, 760, 1080, 320);
+  x.fillStyle = '#4a2a73'; x.beginPath(); x.moveTo(0, 1080); for (let i = 0; i <= 1080; i += 20) x.lineTo(i, 900 + Math.sin(i * 0.008) * 40); x.lineTo(1080, 1080); x.fill();
   x.fillStyle = 'rgba(27,16,54,0.55)'; x.beginPath(); x.roundRect(70, 330, 940, 560, 60); x.fill();
   const fruit = ['apple', 'orange', 'watermelon', 'grapes', 'strawberry', 'pineapple', 'kiwi', 'lemon'];
   fruit.forEach((f, i) => { const im = IMAGES[f]; if (im && im.width) { x.save(); x.translate(100 + i * 126, 960 + (i % 2) * 30); x.rotate((i - 4) * 0.12); x.drawImage(im, -60, -60, 120, 120); x.restore(); } });

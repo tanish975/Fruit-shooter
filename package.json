@@ -1,6 +1,6 @@
 {
   "name": "fruit-archer",
-  "version": "10.0.0",
+  "version": "10.0.1",
   "private": true,
   "description": "Fruit Archer — a mobile-first bow & arrow fruit shooting arcade game",
   "type": "module",
