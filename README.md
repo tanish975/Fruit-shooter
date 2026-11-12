@@ -16,18 +16,32 @@ A portrait, one-thumb archery arcade game for Android. Pull back, aim, and skewe
 
 | Mode | Rules |
 |------|-------|
+| Adventure | 40 stages in 4 worlds, each with a goal and up to 3 stars. Every 10th stage is a boss. |
+| Daily Challenge | One seeded run per day, one attempt. |
 | Time Attack | 60 seconds. Bombs cost 8 seconds, bosses and hourglass bubbles give time back. |
 | Survival | 3 lives. Every fruit that falls unhit costs a life. |
 | Precision | 15 arrows. A perfect hit or a skewer wins the arrow back. |
 
 ## What's in the game
 
-- 15 fruits unlocked level by level, including coconuts that need two hits, plus golden stars and gems
-- King Pumpkin boss every third level
-- Power-ups: Triple Shot, Freeze, Blast Arrows, Double Points, Magnet Arrows
-- Coins, 7 upgrades, 5 bow skins, 12 missions, daily bonus streak, lifetime stats
-- Four sky themes that change as the level climbs
-- Haptic feedback, synthesised sound effects and music, immersive full-screen, back-button and app-switch pause
+- 15 fruits, golden stars and gems, balloons, shields, dodging fruit, wind, and birds to avoid
+- 4 bosses: King Pumpkin, Coco Golem, Melon Queen, Storm King
+- 5 arrow types (Classic, Blast, Frost, Splitter, Ricochet) and 5 timed power-ups
+- Coins, 7 upgrades, 6 bow skins, weekly and career missions, a monthly season track, daily bonus streak
+- Guided training, score sharing as an image, backup and restore by code
+- English, Hindi and Gujarati
+- Haptics, synthesised sound and music, full-screen, back-button and app-switch pause, reduced-motion support
+
+## Privacy
+
+The game works fully offline. It has no accounts, ads, analytics or network calls; progress is stored only on the device. The share button hands an image to the Android share sheet only when you press it.
+
+## Credits
+
+- Fruit and icon art: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT)
+- Animation: [anime.js](https://github.com/juliangarnier/anime) (MIT)
+- Fonts: Lilita One, Nunito, Baloo 2, Baloo Bhai 2 (SIL OFL) via Fontsource
+- Native shell: [Capacitor](https://capacitorjs.com)
 
 ## Development
 

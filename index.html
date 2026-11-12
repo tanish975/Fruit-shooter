@@ -18,12 +18,18 @@
   <!-- In-game HUD -->
   <div id="hud" hidden>
     <div class="hud-top">
-      <div class="pill" id="hudStat"><img id="hudStatIcon" alt="" /><span id="hudStatVal">60</span></div>
+      <div class="hud-left">
+        <div class="pill" id="hudStat"><img id="hudStatIcon" alt="" /><span id="hudStatVal">60</span></div>
+        <div class="pill small" id="hudGoal" hidden><img data-icon="target" alt="" /><span id="hudGoalVal">0/0</span></div>
+      </div>
       <div class="hud-score">
         <div id="hudScore">0</div>
         <div id="hudCombo" class="combo"><b id="hudComboN">0</b> COMBO <i id="hudComboX">x1</i></div>
       </div>
-      <button class="round-btn" id="pauseBtn" aria-label="Pause"><span class="pause-ico"></span></button>
+      <div class="hud-right">
+        <button class="round-btn" id="pauseBtn" aria-label="Pause"><span class="pause-ico"></span></button>
+        <div class="pill small wind" id="hudWind" hidden><img data-icon="wind" alt="" /><span class="wind-arrow" id="windArrow"></span><span id="windVal">0</span></div>
+      </div>
     </div>
     <div class="fever" id="feverWrap"><span class="fever-label">FEVER</span><div class="fever-track"><div class="fever-fill" id="feverFill"></div></div></div>
     <div class="bossbar" id="bossBar" hidden><img id="bossIcon" alt="" /><div class="boss-track"><div class="boss-fill" id="bossFill"></div></div></div>
@@ -35,32 +41,44 @@
   <section class="screen" id="home" hidden>
     <header class="topbar">
       <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
+      <button class="season-chip" data-go="missions" data-mtab="season"><img data-icon="gift" alt="" /><span id="seasonChip">1</span><i><b id="seasonChipBar"></b></i></button>
       <button class="round-btn" data-go="settings" aria-label="Settings"><img data-icon="gear" alt="" /></button>
     </header>
-    <div class="logo rise">
-      <span class="logo-1">FRUIT</span>
-      <span class="logo-2">ARCHER</span>
-    </div>
+    <div class="logo" id="logo"><span class="logo-1">FRUIT</span><span class="logo-2">ARCHER</span></div>
     <div class="home-bottom">
       <div class="modes rise" id="modes"></div>
       <p class="mode-desc rise" id="modeDesc"></p>
-      <button class="btn btn-play rise" id="playBtn">PLAY</button>
+      <button class="btn btn-play rise" id="playBtn" data-i18n="play">PLAY</button>
       <nav class="nav rise">
-        <button class="nav-btn" data-go="shop"><img data-icon="cart" alt="" /><span>Shop</span></button>
-        <button class="nav-btn" data-go="missions"><img data-icon="trophy" alt="" /><span>Missions</span><em class="badge" id="missionBadge" hidden>0</em></button>
-        <button class="nav-btn" data-go="stats"><img data-icon="chart" alt="" /><span>Stats</span></button>
+        <button class="nav-btn" data-go="shop"><img data-icon="cart" alt="" /><span data-i18n="shop">Shop</span></button>
+        <button class="nav-btn" data-go="missions"><img data-icon="trophy" alt="" /><span data-i18n="missions">Missions</span><em class="badge" id="missionBadge" hidden>0</em></button>
+        <button class="nav-btn" data-go="stats"><img data-icon="chart" alt="" /><span data-i18n="stats">Stats</span></button>
       </nav>
     </div>
+  </section>
+
+  <!-- Adventure map -->
+  <section class="screen sheet" id="map" hidden>
+    <header class="topbar">
+      <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
+      <h2 data-i18n="adventure">Adventure</h2>
+      <div class="pill"><img data-icon="star" alt="" /><span id="mapStars">0</span></div>
+    </header>
+    <div class="list map-list" id="mapList"></div>
   </section>
 
   <!-- Shop -->
   <section class="screen sheet" id="shop" hidden>
     <header class="topbar">
       <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
-      <h2>Shop</h2>
+      <h2 data-i18n="shop">Shop</h2>
       <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
     </header>
-    <div class="tabs rise"><button class="tab on" data-tab="upgrades">Upgrades</button><button class="tab" data-tab="bows">Bows</button></div>
+    <div class="tabs three rise" id="shopTabs">
+      <button class="tab on" data-tab="upgrades" data-i18n="upgrades">Upgrades</button>
+      <button class="tab" data-tab="arrows" data-i18n="arrows">Arrows</button>
+      <button class="tab" data-tab="bows" data-i18n="bows">Bows</button>
+    </div>
     <div class="list" id="shopList"></div>
   </section>
 
@@ -68,9 +86,14 @@
   <section class="screen sheet" id="missions" hidden>
     <header class="topbar">
       <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
-      <h2>Missions</h2>
+      <h2 data-i18n="missions">Missions</h2>
       <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
     </header>
+    <div class="tabs three rise" id="missionTabs">
+      <button class="tab on" data-mtab="weekly" data-i18n="weekly">Weekly</button>
+      <button class="tab" data-mtab="career" data-i18n="career">Career</button>
+      <button class="tab" data-mtab="season" data-i18n="season">Season</button>
+    </div>
     <div class="list" id="missionList"></div>
   </section>
 
@@ -78,7 +101,7 @@
   <section class="screen sheet" id="stats" hidden>
     <header class="topbar">
       <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
-      <h2>Stats</h2>
+      <h2 data-i18n="stats">Stats</h2>
       <span class="spacer"></span>
     </header>
     <div class="list" id="statList"></div>
@@ -88,22 +111,19 @@
   <section class="screen sheet" id="settings" hidden>
     <header class="topbar">
       <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
-      <h2>Settings</h2>
+      <h2 data-i18n="settings">Settings</h2>
       <span class="spacer"></span>
     </header>
     <div class="list">
       <div class="card rise toggles" id="toggles"></div>
+      <div class="card rise"><h3 data-i18n="language">Language</h3><div class="langs" id="langs"></div></div>
       <div class="card rise howto">
-        <h3>How to play</h3>
-        <ul>
-          <li><b>Drag down</b> anywhere, like a slingshot. The dotted guide shows the arrow's path.</li>
-          <li><b>Release</b> to shoot. Hit a fruit dead centre for a <b>PERFECT</b> (double points).</li>
-          <li>Arrows fly straight through fruit: line several up for a <b>SKEWER</b> multiplier.</li>
-          <li>Keep hitting to build your <b>combo</b> and fill the <b>FEVER</b> bar.</li>
-          <li>Never shoot the <b>bombs</b>. Do shoot the floating <b>power-up bubbles</b>.</li>
-        </ul>
+        <h3 data-i18n="howto">How to play</h3>
+        <ul><li data-i18n="how1"></li><li data-i18n="how2"></li><li data-i18n="how3"></li><li data-i18n="how4"></li><li data-i18n="how5"></li></ul>
       </div>
-      <button class="btn btn-ghost rise" id="resetBtn">Reset all progress</button>
+      <button class="btn btn-alt rise" id="tutBtn" data-i18n="replayTut">Replay tutorial</button>
+      <button class="btn btn-alt rise" id="backupBtn" data-i18n="backup">Backup &amp; restore</button>
+      <button class="btn btn-ghost rise" id="resetBtn" data-i18n="reset">Reset all progress</button>
       <p class="credits rise">Fruit Archer v<span id="ver"></span><br />Fruit art: Microsoft Fluent Emoji (MIT) · Motion: anime.js</p>
     </div>
   </section>
@@ -111,12 +131,13 @@
   <!-- Pause -->
   <section class="screen modal" id="pause" hidden>
     <div class="panel">
-      <h2 class="rise">Paused</h2>
+      <h2 class="rise" data-i18n="paused">Paused</h2>
+      <p class="rise dim" id="pauseGoal" hidden></p>
       <div class="toggles rise" id="pauseToggles"></div>
-      <button class="btn btn-play rise" id="resumeBtn">RESUME</button>
+      <button class="btn btn-play rise" id="resumeBtn" data-i18n="resume">RESUME</button>
       <div class="row rise">
-        <button class="btn btn-alt" id="restartBtn">Restart</button>
-        <button class="btn btn-ghost" id="quitBtn">Quit</button>
+        <button class="btn btn-alt" id="restartBtn" data-i18n="restart">Restart</button>
+        <button class="btn btn-ghost" id="quitBtn" data-i18n="quit">Quit</button>
       </div>
     </div>
   </section>
@@ -124,26 +145,31 @@
   <!-- Game over -->
   <section class="screen modal" id="over" hidden>
     <div class="panel">
-      <div class="ribbon" id="bestRibbon" hidden>NEW BEST!</div>
+      <div class="ribbon" id="bestRibbon" hidden data-i18n="newBest">NEW BEST!</div>
+      <button class="round-btn share-btn" id="shareBtn" aria-label="Share"><img data-icon="share" alt="" /></button>
       <p class="over-mode rise" id="overMode"></p>
+      <div class="over-stars rise" id="overStars" hidden></div>
       <div class="over-score rise" id="overScore">0</div>
       <p class="over-best rise" id="overBest"></p>
       <div class="grid rise" id="overGrid"></div>
-      <div class="earned rise"><img data-icon="coin" alt="" /><span id="overCoins">+0</span></div>
+      <div class="earned rise" id="earned"><img data-icon="coin" alt="" /><span id="overCoins">+0</span></div>
+      <div class="season-line rise" id="overSeason"></div>
       <p class="over-note rise" id="overNote" hidden></p>
       <button class="btn btn-play rise" id="againBtn">PLAY AGAIN</button>
       <div class="row rise">
-        <button class="btn btn-alt" id="overShop">Shop</button>
-        <button class="btn btn-ghost" id="overHome">Home</button>
+        <button class="btn btn-alt" id="overAlt">Shop</button>
+        <button class="btn btn-ghost" id="overHome" data-i18n="home">Home</button>
       </div>
     </div>
   </section>
 
-  <!-- Daily bonus / confirm -->
+  <!-- Dialogs -->
   <section class="screen modal" id="dialog" hidden>
     <div class="panel" id="dialogPanel"></div>
   </section>
 
+  <div id="wipe"></div>
+  <div id="fx"></div>
   <div id="toast"></div>
   <script type="module" src="/src/main.js"></script>
 </body>
