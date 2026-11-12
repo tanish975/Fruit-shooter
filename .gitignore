@@ -9,3 +9,7 @@ Thumbs.db
 __pycache__/
 *.bak
 *.swp
+dist/
+*.p12
+*.jks
+*.keystore
