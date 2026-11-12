@@ -1,8 +1,6 @@
 // Fruit Archer — boot, screens, HUD and all menu logic.
 import '@fontsource/lilita-one';
 import '@fontsource-variable/nunito';
-import '@fontsource/baloo-2/devanagari-400.css';
-import '@fontsource/baloo-bhai-2/gujarati-400.css';
 import './style.css';
 import { animate, stagger } from 'animejs';
 import { Game } from './game.js';
@@ -10,7 +8,7 @@ import { store } from './store.js';
 import { audio, sfx } from './audio.js';
 import { buzz, onBack, onAppPause, exitApp, isNative } from './platform.js';
 import { MODES, UPGRADES, upgradeCost, SKINS, MISSIONS, DAILY, POWERUPS, ARROWS, BOSSES, WORLDS, STAGES, WEEKLY, SEASON } from './data.js';
-import { t, LANGS, setLang, initLang, lang } from './i18n.js';
+import { t } from './i18n.js';
 import { dayKey, ensurePeriods, weeklyList, totalStars, stageUnlocked, weekDaysLeft, seasonDaysLeft } from './meta.js';
 import { version } from '../package.json';
 
@@ -38,7 +36,6 @@ function loadImages() {
 
 // ---------------------------------------------------------------- state
 store.load();
-initLang();
 ensurePeriods();
 const d = () => store.data;
 let game = null;
@@ -54,9 +51,7 @@ const dailyPlayed = () => d().daily.chDate === dayKey();
 // ---------------------------------------------------------------- i18n
 function applyI18n() {
   $$('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
-  document.documentElement.dataset.lang = lang();
 }
-const canvasFont = () => document.fonts.load(`40px "${lang() === 'hi' ? 'Baloo 2' : lang() === 'gu' ? 'Baloo Bhai 2' : 'Lilita One'}"`, 'अ ગ A').catch(() => {});
 
 // ---------------------------------------------------------------- screens
 const SCREENS = ['home', 'map', 'shop', 'missions', 'stats', 'settings', 'pause', 'over', 'dialog'];
@@ -98,7 +93,7 @@ function render(id) {
   if (id === 'shop') renderShop();
   if (id === 'missions') renderMissions();
   if (id === 'stats') renderStats();
-  if (id === 'settings') { renderToggles($('#toggles')); renderLangs(); }
+  if (id === 'settings') { renderToggles($('#toggles')); }
   if (id === 'pause') renderPause();
 }
 
@@ -432,9 +427,6 @@ function renderToggles(el) {
     <button class="toggle ${d().settings[k] ? 'on' : ''}" data-toggle="${k}" role="switch" aria-checked="${d().settings[k]}">
       <span>${t(label)}</span><i></i></button>`).join('');
 }
-function renderLangs() {
-  $('#langs').innerHTML = LANGS.map(([code, name]) => `<button class="lang ${lang() === code ? 'on' : ''}" data-lang="${code}">${name}</button>`).join('');
-}
 function renderPause() {
   renderToggles($('#pauseToggles'));
   const g = $('#pauseGoal');
@@ -474,10 +466,8 @@ function backupDialog() {
       sfx('click'); toast(t('copied'));
     };
     p.querySelector('[data-x=restore]').onclick = () => {
-      const lng = lang();
       if (!box.value.trim() || !store.importCode(box.value)) { sfx('deny'); shake(box); toast(t('restoreBad')); return; }
-      if (!d().settings.lang) d().settings.lang = lng;
-      setLang(d().settings.lang); applyI18n(); ensurePeriods(); store.save();
+      ensurePeriods(); store.save();
       audio.syncMusic(); sfx('buy'); show('home'); toast(t('restoreOk'));
     };
   });
@@ -695,7 +685,7 @@ function shareCanvas(r) {
   const fruit = ['apple', 'orange', 'watermelon', 'grapes', 'strawberry', 'pineapple', 'kiwi', 'lemon'];
   fruit.forEach((f, i) => { const im = IMAGES[f]; if (im && im.width) { x.save(); x.translate(100 + i * 126, 960 + (i % 2) * 30); x.rotate((i - 4) * 0.12); x.drawImage(im, -60, -60, 120, 120); x.restore(); } });
   const text = (s, y, size, color, stroke = 14) => {
-    x.font = `${size}px "Lilita One", "Baloo 2", "Baloo Bhai 2", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.font = `${size}px "Lilita One", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.lineJoin = 'round'; x.lineWidth = stroke; x.strokeStyle = '#1b1036'; x.strokeText(s, 540, y); x.fillStyle = color; x.fillText(s, 540, y);
   };
   x.save(); x.translate(540, 180); x.rotate(-0.06); x.translate(-540, -180);
@@ -792,10 +782,6 @@ document.addEventListener('click', e => {
   else if (ds.buyarrow) buyOrEquip('arrows', ARROWS, ds.buyarrow, b);
   else if (ds.claim) claimMission(ds.claim, b);
   else if (ds.wclaim) claimWeekly(ds.wclaim, b);
-  else if (ds.lang) {
-    d().settings.lang = ds.lang; store.save(); setLang(ds.lang); applyI18n(); sfx('click'); buzz('light');
-    canvasFont(); show('settings');
-  }
   else if (ds.toggle) {
     const s = d().settings; s[ds.toggle] = !s[ds.toggle]; store.save();
     b.classList.toggle('on', s[ds.toggle]); b.setAttribute('aria-checked', s[ds.toggle]);
@@ -832,7 +818,6 @@ buildLogo();
 Promise.all([
   loadImages(),
   document.fonts.load('40px "Lilita One"').catch(() => {}),
-  canvasFont(),
 ]).then(([images]) => {
   IMAGES = images;
   game = new Game($('#game'), images, { onGameOver, onTutorialDone, onFrame: g => hud.update(g) });

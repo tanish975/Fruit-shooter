@@ -251,12 +251,7 @@ h2, h3, .btn, .logo, strong { font-family: var(--display); font-weight: 400; let
 .hud-level { position: absolute; left: calc(var(--sal) + 14px); bottom: calc(var(--sab) + 14px); font: 400 14px var(--display); letter-spacing: 0.08em; padding: 4px 10px; border-radius: 12px; background: rgba(27, 16, 54, 0.7); }
 
 
-/* ------------------------------------------------------------ v9: language fonts */
-html[data-lang='hi'] { --display: 'Baloo 2', 'Lilita One', system-ui, sans-serif; --body: 'Nunito Variable', 'Baloo 2', system-ui, sans-serif; }
-html[data-lang='gu'] { --display: 'Baloo Bhai 2', 'Lilita One', system-ui, sans-serif; --body: 'Nunito Variable', 'Baloo Bhai 2', system-ui, sans-serif; }
 .logo, .logo span { font-family: 'Lilita One', system-ui, sans-serif; }
-html:not([data-lang='en']) .btn-play { letter-spacing: 0; font-size: 28px; }
-html:not([data-lang='en']) .mode strong { font-size: 15px; }
 
 /* ------------------------------------------------------------ v9: motion layer */
 #wipe { position: absolute; left: 50%; top: 50%; width: 250vmax; height: 250vmax; margin: -125vmax 0 0 -125vmax; border-radius: 50%; z-index: 60; pointer-events: none; transform: scale(0); visibility: hidden;
@@ -381,9 +376,6 @@ body.fever-on #hud::before { content: ''; position: absolute; inset: 0; pointer-
 .tier-bow { width: 20px; height: 24px; border: 4px solid var(--gold); border-right: 0; border-radius: 24px 0 0 24px; box-sizing: border-box; }
 
 /* settings extras */
-.langs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.lang { height: 44px; border-radius: 14px; background: rgba(0, 0, 0, 0.28); border: 2px solid transparent; font-size: 16px; transition: border-color 0.15s, background-color 0.15s; }
-.lang.on { border-color: var(--lime); background: rgba(166, 240, 106, 0.16); }
 .code { width: 100%; height: 96px; padding: 10px; border-radius: 14px; border: 2px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--cream); font: 600 12px/1.3 ui-monospace, monospace; resize: none; word-break: break-all; user-select: text; -webkit-user-select: text; outline: none; }
 .code:focus { border-color: var(--gold); }
 

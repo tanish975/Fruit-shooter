@@ -17,7 +17,7 @@ const ARROW_LEN = 78;
 const FRUIT_G = 430;
 const FEVER_TIME = 7;
 const INK = '#1b1036';
-const FONT = '"Lilita One", "Baloo 2", "Baloo Bhai 2", sans-serif';
+const FONT = '"Lilita One", sans-serif';
 const MOD_LEVEL = { balloon: 2, bird: 3, dodge: 4, wind: 5, shield: 7 };
 const CONFETTI = ['#ff5470', '#ffd23f', '#a6f06a', '#5ce1ff', '#c77dff', '#ff8a1f'];
 

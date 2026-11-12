@@ -12,7 +12,7 @@ const defaults = () => ({
   season: { id: '', xp: 0, tier: 0 },
   stats: { games: 0, fruits: 0, perfects: 0, bestCombo: 0, bestSkewer: 0, bosses: 0, fevers: 0, shots: 0, hits: 0, coinsEarned: 0, stars: 0 },
   claimed: {},
-  settings: { sfx: true, music: true, haptics: true, lang: '' },
+  settings: { sfx: true, music: true, haptics: true },
   daily: { last: '', streak: 0, chDate: '', chScore: 0 },
   tutorialDone: false,
   lastMode: 'stage',
@@ -38,7 +38,7 @@ export const store = {
   save() {
     try { localStorage.setItem(KEY, JSON.stringify(this.data)); } catch { /* storage full or blocked */ }
   },
-  reset() { const lang = this.data.settings.lang; this.data = defaults(); this.data.settings.lang = lang; this.save(); },
+  reset() { this.data = defaults(); this.save(); },
   /** Portable backup code: base64 of the save JSON. */
   exportCode() { return btoa(unescape(encodeURIComponent(JSON.stringify(this.data)))); },
   importCode(code) {

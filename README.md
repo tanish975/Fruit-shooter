@@ -29,7 +29,6 @@ A portrait, one-thumb archery arcade game for Android. Pull back, aim, and skewe
 - 5 arrow types (Classic, Blast, Frost, Splitter, Ricochet) and 5 timed power-ups
 - Coins, 7 upgrades, 6 bow skins, weekly and career missions, a monthly season track, daily bonus streak
 - Guided training, score sharing as an image, backup and restore by code
-- English, Hindi and Gujarati
 - Haptics, synthesised sound and music, full-screen, back-button and app-switch pause, reduced-motion support
 
 ## Privacy
@@ -40,7 +39,7 @@ The game works fully offline. It has no accounts, ads, analytics or network call
 
 - Fruit and icon art: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT)
 - Animation: [anime.js](https://github.com/juliangarnier/anime) (MIT)
-- Fonts: Lilita One, Nunito, Baloo 2, Baloo Bhai 2 (SIL OFL) via Fontsource
+- Fonts: Lilita One, Nunito (SIL OFL) via Fontsource
 - Native shell: [Capacitor](https://capacitorjs.com)
 
 ## Development
@@ -80,6 +79,6 @@ install in place, add three repository secrets (Settings → Secrets and variabl
 | `src/audio.js` | WebAudio sound effects and generative music |
 | `src/platform.js` | Capacitor bridge: haptics, back button, app pause |
 | `android/` | Capacitor Android project |
-| `src/i18n.js` | English, Hindi and Gujarati strings |
+| `src/i18n.js` | all player-facing text |
 | `src/meta.js` | weekly missions, season track, daily challenge bookkeeping |
 | `legacy/` | the original v7 browser game, kept for reference |
