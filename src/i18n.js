@@ -238,6 +238,8 @@ const S = {
   scene_2: "Night",
   scene_3: "Dawn",
   lefty: "Left-handed layout",
+  remind: "Daily reminder notification",
+  mode_event: "Weekend Event",
   marks: "Hazard markers",
   sens: "Aim sensitivity",
   sens_low: "Low",

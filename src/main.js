@@ -6,10 +6,10 @@ import { animate, stagger } from 'animejs';
 import { Game } from './game.js';
 import { store } from './store.js';
 import { audio, sfx } from './audio.js';
-import { buzz, onBack, onAppPause, exitApp, isNative } from './platform.js';
-import { MODES, UPGRADES, upgradeCost, SKINS, MISSIONS, DAILY, POWERUPS, ARROWS, BOSSES, WORLDS, STAGES, WEEKLY, SEASON, THEMES, DIFFS, diffById, stageById, ENDLESS_NAME } from './data.js';
+import { buzz, onBack, onAppPause, exitApp, isNative, setReminders } from './platform.js';
+import { MODES, UPGRADES, upgradeCost, SKINS, MISSIONS, DAILY, POWERUPS, ARROWS, BOSSES, WORLDS, STAGES, WEEKLY, SEASON, THEMES, DIFFS, diffById, stageById, ENDLESS_NAME, FRUITS, QUEST_COINS, CAL_DAYS, calReward, FREEZE_COST, FREEZE_MAX, OUTFITS, HATS, PETS, STORY, BOSS_LINES, FACTS } from './data.js';
 import { t } from './i18n.js';
-import { dayKey, ensurePeriods, weeklyList, totalStars, stageUnlocked, weekDaysLeft, seasonDaysLeft } from './meta.js';
+import { dayKey, ensurePeriods, weeklyList, totalStars, stageUnlocked, weekDaysLeft, seasonDaysLeft, questList, questsAllClaimed, currentEvent, eventDaysAway, calendarState, claimCalendar, openChest } from './meta.js';
 import { version } from '../package.json';
 
 const $ = s => document.querySelector(s);
@@ -58,7 +58,7 @@ function applyI18n() {
 }
 
 // ---------------------------------------------------------------- screens
-const SCREENS = ['home', 'map', 'shop', 'missions', 'stats', 'settings', 'pause', 'over', 'dialog'];
+const SCREENS = ['home', 'map', 'extra', 'shop', 'missions', 'stats', 'settings', 'pause', 'over', 'dialog'];
 
 function show(id, opts = {}) {
   const from = current;
@@ -94,11 +94,12 @@ function render(id) {
   refreshCoins();
   if (id === 'home') renderHome();
   if (id === 'map') renderMap();
-  if (id === 'shop') renderShop();
+  if (id === 'shop') { d().shopSeen = d().coins; renderShop(); }
   if (id === 'missions') renderMissions();
-  if (id === 'stats') renderStats();
+  if (id === 'stats') { renderStats(); d().trophySeen = trophyCount(); }
   if (id === 'settings') renderSettings();
   if (id === 'pause') renderPause();
+  if (id === 'extra') renderExtra();
 }
 
 /** Circular wipe: cover the screen, run `mid`, uncover. Used between menus and play. */
@@ -182,6 +183,7 @@ function renderHome() {
       <span><strong>${t('mode_' + m.id)}</strong><small>${modeTag(m.id)}</small></span>
     </button>`).join('');
   $('#modeDesc').textContent = selectedMode === 'daily' && dailyPlayed() ? t('dailyDone', { n: fmt(d().daily.chScore) }) : t('d_' + selectedMode);
+  ensurePeriods(); renderHub();
   const n = claimable(), b = $('#missionBadge');
   b.hidden = !n; b.textContent = n;
   const s = d().season;
@@ -191,14 +193,14 @@ function renderHome() {
   $('#seasonChipBar').style.transform = `scaleX(${s.tier >= SEASON.tiers ? 1 : (s.xp % SEASON.xpPerTier) / SEASON.xpPerTier})`;
 }
 
-function startGame(mode, stage = null) {
+function startGame(mode, stage = null, eventId = null) {
   if (busy) return;
   if (mode === 'daily' && dailyPlayed()) { sfx('deny'); toast(t('dailyDone', { n: fmt(d().daily.chScore) })); return; }
-  if (mode !== 'tutorial') { selectedMode = mode; d().lastMode = mode; store.save(); }
+  if (mode !== 'tutorial' && mode !== 'event') { selectedMode = mode; d().lastMode = mode; store.save(); }
   audio.unlock();
   wipe(() => {
     hud.reset(mode, stage);
-    game.start(mode, stage);
+    game.start(mode, stage, eventId);
     show('play');
   });
 }
@@ -268,6 +270,7 @@ function stageIntro(id) {
     <p class="over-mode rise">${worldName(s)}</p>
     <h2 class="rise">${s.boss >= 0 ? BOSSES[s.boss].name : t('stage', { n: id })}</h2>
     ${s.boss >= 0 ? `<img class="boss-face rise" src="${ICON[BOSSES[s.boss].img]}" alt="" />` : ''}
+    ${s.boss >= 0 && BOSS_LINES[s.boss] ? `<p class="quote rise">"${BOSS_LINES[s.boss].taunt}"</p>` : id <= STAGES.length && id % 10 === 1 && !have ? `<p class="quote rise">${STORY[s.world] || ''}</p>` : ''}
     <div class="goal-box rise">${icon('target')}<div><strong>${goal}</strong><small>${limitText(s)}</small></div></div>
     <div class="tags rise">${mods}</div>
     ${hintBox(s)}
@@ -456,7 +459,7 @@ function renderStats() {
 
 // ---------------------------------------------------------------- settings
 const TOGGLES = [['sfx', 'sfx'], ['music', 'music'], ['haptics', 'vibration']];
-const TOGGLES_MORE = [['lefty', 'lefty'], ['marks', 'marks']];
+const TOGGLES_MORE = [['lefty', 'lefty'], ['marks', 'marks'], ['remind', 'remind']];
 const SENS = [[0.75, 'sens_low'], [1, 'sens_mid'], [1.35, 'sens_high']];
 const diffButtons = attr => DIFFS.map(x => `<button class="diff ${d().settings.diff === x.id ? 'on' : ''}" ${attr}="${x.id}" style="--c:${x.color}"><strong>${x.name}</strong><small>${x.desc}</small></button>`).join('');
 function renderSettings() {
@@ -575,28 +578,273 @@ function welcome() {
 }
 
 function checkDaily() {
-  const today = dayKey(), daily = d().daily;
-  if (daily.last === today) return false;
-  const streak = daily.last === dayKey(Date.now() - 864e5) ? (daily.streak % 7) + 1 : 1;
-  const reward = DAILY[streak - 1];
-  const days = DAILY.map((v, i) => `<div class="day ${i + 1 < streak ? 'past' : i + 1 === streak ? 'now' : ''}"><small>${t('day', { n: i + 1 })}</small>${icon('coin')}<b>${v}</b></div>`).join('');
-  dialog(`<h2 class="rise">${t('dailyBonus')}</h2><p class="rise dim">${t('dailyBonusText')}</p>
-    <div class="days rise">${days}</div><button class="btn btn-play rise" data-x="ok">${t('claimN', { n: reward })}</button>`,
-  (p) => {
-    const btn = p.querySelector('[data-x=ok]');
-    btn.onclick = () => {
-      audio.unlock();
-      const before = d().coins;
-      daily.last = today; daily.streak = streak; d().coins += reward; store.save();
-      sfx('buy'); buzz('success');
-      const r = btn.getBoundingClientRect();
-      show('home');
-      coinFly({ getBoundingClientRect: () => r }, 10);
-      refreshCoins(before);
+  syncReminder();
+  if (calendarState().claimed) return false;
+  openExtra('calendar');
+  if (!reduceMotion) animate('.cal-day.now', { scale: [1, 1.14, 1], duration: 900, delay: 500, loop: 3, ease: 'inOutSine' });
+  return true;
+}
+
+// ---------------------------------------------------------------- v11: hub, calendar, quests, chests, book, style, event
+let extraKind = 'calendar';
+const EXTRA_TITLES = { calendar: 'Calendar', quests: 'Quests', book: 'Fruit Book', style: 'Style' };
+const gemsHtml = n => `${icon('gem')}${fmt(n)}`;
+const refreshGems = () => $$('.gemCount').forEach(e => { e.textContent = fmt(d().gems); });
+
+const questsReady = () => questList().filter(q => !d().quests.claimed[q.id] && (d().quests.prog[q.id] || 0) >= q.goal).length
+  + (questsAllClaimed() && !d().quests.chest ? 1 : 0);
+const bookKeys = () => Object.keys(d().book).filter(k => d().book[k] > 0).length;
+const styleAffordable = () => [...OUTFITS.filter(o => !d().style.outfits.includes(o.id)), ...HATS.filter(o => !d().style.hats.includes(o.id))].some(o => d().gems >= o.cost)
+  || PETS.some(o => !d().style.pets.includes(o.id) && d().coins >= o.cost);
+const trophyCount = () => trophies().filter(x => x.on).length;
+const shopHasNew = () => d().coins > (d().shopSeen ?? -1) && UPGRADES.some(u => store.up(u.id) < u.max && d().coins >= upgradeCost(u, store.up(u.id)));
+
+/** The row of round shortcuts on the home screen. A dot means there is something to collect or see. */
+function renderHub() {
+  const ev = currentEvent(), cal = calendarState();
+  const tiles = [
+    ['calendar', 'calendar', 'Calendar', !cal.claimed, ''],
+    ['quests', 'scroll', 'Quests', questsReady() > 0, ''],
+    ['chest', 'gift', 'Chests', d().chests > 0, d().chests > 0 ? d().chests : ''],
+    ['event', 'tent', ev ? 'Event' : 'Event', !!ev && !d().event.played, ''],
+    ['book', 'book', 'Book', bookKeys() > d().bookSeen, ''],
+    ['style', 'shirt', 'Style', styleAffordable(), ''],
+  ];
+  $('#hub').innerHTML = tiles.map(([id, ic, label, dot, n]) => `
+    <button class="hub-btn ${id === 'event' && !ev ? 'off' : ''}" data-hub="${id}">${icon(ic)}<span>${label}</span>${n !== '' ? `<em class="badge">${n}</em>` : dot ? '<em class="dot"></em>' : ''}</button>`).join('');
+  $('#shopDot').hidden = !shopHasNew();
+  $('#statsDot').hidden = trophyCount() <= d().trophySeen;
+  const w = d().week;
+  $('#weekCard').innerHTML = w.games
+    ? `<small>THIS WEEK YOU</small><span>${icon('apple')}<b>${fmt(w.fruits)}</b> hit</span><span>${icon('fire')}<b>${w.combo}</b> combo</span><span>${icon('star')}<b>${w.stars}</b> stars</span><span>${icon('bow')}<b>${w.games}</b> runs</span>`
+    : `<small>NEW WEEK</small><span class="wide">Play a run to start this week's records.</span>`;
+}
+
+function openExtra(kind) {
+  extraKind = kind;
+  if (kind === 'book') { d().bookSeen = bookKeys(); store.save(); }
+  show('extra');
+}
+
+function renderExtra() {
+  $('#extraTitle').textContent = EXTRA_TITLES[extraKind];
+  refreshGems();
+  const el = $('#extraList');
+  if (extraKind === 'calendar') el.innerHTML = calendarHtml();
+  else if (extraKind === 'quests') el.innerHTML = questsHtml();
+  else if (extraKind === 'book') el.innerHTML = bookHtml();
+  else el.innerHTML = styleHtml();
+  $$('#extraList img[data-icon]').forEach(i => { i.src = ICON[i.dataset.icon]; });
+}
+
+// ---- calendar
+function calendarHtml() {
+  const st = calendarState(), dl = d().daily;
+  const done = st.claimed ? st.day : st.day - 1;
+  const cells = Array.from({ length: CAL_DAYS }, (_, i) => {
+    const n = i + 1, r = calReward(n);
+    const cls = n <= done ? 'past' : n === st.day && !st.claimed ? 'now' : '';
+    return `<div class="cal-day ${cls} ${r.chests ? 'big' : ''}"><small>${n}</small>${icon(r.chests ? 'gift' : 'coin')}<b>${r.coins}</b>${n <= done ? `<i>${icon('check')}</i>` : ''}</div>`;
+  }).join('');
+  const rew = calReward(st.day);
+  const note = st.claimed ? 'Come back tomorrow for the next day.'
+    : st.reset ? 'You missed a day without a freeze, so the calendar starts again.'
+      : st.used ? `A streak freeze covered ${st.used} missed day${st.used > 1 ? 's' : ''}.` : 'Play every day. Each 7th day pays a chest.';
+  return `
+    <div class="card rise cal-head">
+      <div><b>${st.claimed ? st.day : done}</b><small>day streak</small></div>
+      <div>${icon('snowflake')}<b>${dl.freezes} / ${FREEZE_MAX}</b><small>freezes</small></div>
+      <button class="btn btn-buy ${dl.freezes >= FREEZE_MAX ? 'locked' : ''}" data-freeze="1" ${dl.freezes >= FREEZE_MAX ? 'disabled' : ''}>${icon('coin')}${FREEZE_COST}</button>
+    </div>
+    <p class="dim rise center">${note}</p>
+    <div class="cal rise">${cells}</div>
+    <button class="btn btn-play rise" data-calclaim="1" ${st.claimed ? 'disabled' : ''}>${st.claimed ? 'CLAIMED' : `CLAIM DAY ${st.day}: ${rew.coins}${rew.chests ? ' + CHEST' : ''}`}</button>`;
+}
+function doCalClaim(btn) {
+  audio.unlock();
+  const before = d().coins, res = claimCalendar();
+  if (!res) return;
+  store.save(); sfx('buy'); buzz('success');
+  coinFly(btn, 10);
+  renderExtra(); refreshCoins(before);
+  if (!reduceMotion) animate('.cal-day.past:last-of-type, .cal-day.past', { scale: [1.25, 1], duration: 420, delay: stagger(8), ease: 'outBack' });
+  syncReminder();
+  if (res.chests) setTimeout(() => chestDialog(), 700);
+}
+function buyFreeze(btn) {
+  if (d().coins < FREEZE_COST) return deny(btn, FREEZE_COST);
+  const before = d().coins;
+  d().coins -= FREEZE_COST; d().daily.freezes++; store.save();
+  sfx('buy'); buzz('success'); renderExtra(); refreshCoins(before);
+  toast(`${icon('snowflake')} Streak freeze ready. It covers one missed day.`);
+}
+
+// ---- daily quests
+function questsHtml() {
+  const q = d().quests, all = questsAllClaimed();
+  const rows = questList().map(x => missionRow({
+    ic: x.icon, title: x.text.replace('{n}', fmt(x.goal)), sub: '', prog: q.prog[x.id] || 0, goal: x.goal, reward: QUEST_COINS, claimed: !!q.claimed[x.id], attr: `data-qclaim="${x.id}"`,
+  })).join('');
+  const n = questList().filter(x => q.claimed[x.id]).length;
+  return `<p class="dim rise center">Three new quests every day. Finish all three for a chest.</p>${rows}
+    <div class="card item rise chest-row ${q.chest ? 'claimed' : ''}">${icon('gift', 'item-ico')}
+      <div class="item-info"><strong>Quest chest</strong><small>${n} / 3 quests claimed</small></div>
+      ${q.chest ? `<span class="tick">${icon('check')}</span>` : `<button class="btn btn-buy ${all ? 'claim' : 'locked'}" data-qchest="1" ${all ? '' : 'disabled'}>OPEN</button>`}
+    </div>`;
+}
+function claimQuest(id, btn) {
+  const before = d().coins;
+  d().quests.claimed[id] = true; d().coins += QUEST_COINS; store.save();
+  sfx('buy'); buzz('success'); coinFly(btn, 7);
+  setTimeout(() => { renderExtra(); refreshCoins(before); }, reduceMotion ? 0 : 240);
+}
+function claimQuestChest() {
+  if (d().quests.chest || !questsAllClaimed()) return;
+  d().quests.chest = true; d().chests++; store.save();
+  renderExtra(); chestDialog();
+}
+
+// ---- chests
+function chestDialog() {
+  if (d().chests <= 0) {
+    sfx('click');
+    return dialog(`<img class="hero rise" src="${ICON.gift}" alt="" /><h2 class="rise">No chests yet</h2>
+      <p class="rise dim">Earn chests from every 7th calendar day, the daily quest set, every 5th stage you clear, and the weekend event.</p>
+      <button class="btn btn-alt rise full" data-x="no">OK</button>`, (p, close) => { p.querySelector('[data-x=no]').onclick = () => { sfx('back'); close(); }; });
+  }
+  dialog(`<p class="over-mode rise">${d().chests} chest${d().chests > 1 ? 's' : ''} to open</p>
+    <div class="chest" id="chestBox"><span class="chest-rays"></span><img src="${ICON.gift}" alt="" /></div>
+    <div class="loot" id="loot"></div>
+    <button class="btn btn-play rise" data-x="ok">OPEN</button>
+    <button class="btn btn-ghost rise full" data-x="no">Later</button>`,
+  (p, close) => {
+    const ok = p.querySelector('[data-x=ok]'), no = p.querySelector('[data-x=no]');
+    let opened = false;
+    no.onclick = () => { sfx('back'); close(); };
+    ok.onclick = async () => {
+      if (opened) { if (d().chests > 0) return chestDialog(); sfx('click'); return close(); }
+      if (ok.disabled) return;
+      ok.disabled = true; no.hidden = true;
+      const before = d().coins, loot = openChest();
+      store.save();
+      const box = $('#chestBox');
+      if (!reduceMotion) {
+        sfx('whoosh');
+        await animate(box.querySelector('img'), { rotate: [0, -10, 10, -12, 12, -6, 6, 0], scale: [1, 1.08, 1.16], duration: 760, ease: 'inOutSine' }).then();
+        box.classList.add('open'); burst(box);
+        animate(box.querySelector('img'), { scale: [1.5, 1], duration: 520, ease: 'outElastic(1, .5)' });
+      } else box.classList.add('open');
+      sfx('best'); buzz('success');
+      const items = [['coin', '+' + fmt(loot.coins), 'coins'], ['gem', '+' + loot.gems, 'gems']];
+      if (loot.freeze) items.push(['snowflake', '+1', 'streak freeze']);
+      $('#loot').innerHTML = items.map(([i, v, l]) => `<div class="loot-item">${icon(i)}<b>${v}</b><small>${l}</small></div>`).join('');
+      if (!reduceMotion) animate('#loot .loot-item', { opacity: [0, 1], translateY: [40, 0], scale: [0.4, 1], duration: 520, delay: stagger(170, { start: 120 }), ease: 'outBack', onBegin: () => sfx('coin') });
+      refreshCoins(before); refreshGems();
+      p.querySelector('.over-mode').textContent = 'You found';
+      opened = true; ok.disabled = false;
+      ok.textContent = d().chests > 0 ? `OPEN NEXT (${d().chests})` : 'COLLECT';
     };
   });
-  if (!reduceMotion) animate('.day.now', { scale: [1, 1.12, 1], duration: 900, delay: 500, loop: 3, ease: 'inOutSine' });
-  return true;
+  if (!reduceMotion) animate('#chestBox img', { translateY: [0, -8, 0], duration: 1400, loop: true, ease: 'inOutSine' });
+}
+/** A ring of flat confetti squares flying out of `el`. */
+function burst(el, n = 16) {
+  if (reduceMotion) return;
+  const r = el.getBoundingClientRect(), fx = $('#fx'), colors = ['#ffd23f', '#ff5470', '#5ce1ff', '#a6f06a', '#ff8a1f'];
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('i');
+    s.className = 'spark'; s.style.cssText = `left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;background:${colors[i % colors.length]}`;
+    fx.appendChild(s);
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.4, dist = 70 + Math.random() * 80;
+    animate(s, { translateX: Math.cos(a) * dist, translateY: Math.sin(a) * dist + 30, rotate: Math.random() * 540, scale: [1, 0.2], opacity: [1, 0], duration: 700 + Math.random() * 300, ease: 'outQuart', onComplete: () => s.remove() });
+  }
+}
+
+// ---- fruit book
+function bookHtml() {
+  const bk = d().book, s = d().stats;
+  const tile = (id, img, kind) => `<button class="book-tile ${bk[id] ? 'on' : 'off'}" data-book="${kind}:${id}">${icon(img)}<b>${bk[id] ? fmt(bk[id]) : '?'}</b></button>`;
+  const got = FRUITS.filter(f => bk[f.id]).length + BOSSES.filter(b => bk[b.id]).length;
+  return `<div class="card rise cal-head"><div><b>${got} / ${FRUITS.length + BOSSES.length}</b><small>discovered</small></div><div><b>${s.bestSkewer ? 'x' + s.bestSkewer : '-'}</b><small>best skewer</small></div><div><b>${fmt(s.skill || 0)}</b><small>skill shots</small></div></div>
+    <div class="card rise"><h3>Fruit</h3><div class="book">${FRUITS.map(f => tile(f.id, f.id, 'f')).join('')}</div></div>
+    <div class="card rise"><h3>Bosses</h3><div class="book four">${BOSSES.map(b => tile(b.id, b.img, 'b')).join('')}</div></div>`;
+}
+function bookEntry(key) {
+  const [kind, id] = key.split(':'), n = d().book[id] || 0;
+  sfx(n ? 'star' : 'click');
+  if (kind === 'f') {
+    const f = FRUITS.find(x => x.id === id), name = id[0].toUpperCase() + id.slice(1);
+    return dialog(`<img class="hero rise ${n ? '' : 'shade'}" src="${ICON[id]}" alt="" /><h2 class="rise">${n ? name : '???'}</h2>
+      ${n ? `<div class="stats3 rise"><div class="stat"><b>${fmt(n)}</b><span>hit</span></div><div class="stat"><b>${f.pts}</b><span>points</span></div><div class="stat"><b>Lv ${f.lvl}</b><span>appears</span></div></div><p class="rise dim">${FACTS[id] || ''}</p>`
+        : `<p class="rise dim">Not hit yet. It first appears at level ${f.lvl}.</p>`}
+      <button class="btn btn-alt rise full" data-x="no">Close</button>`, (p, close) => { p.querySelector('[data-x=no]').onclick = () => { sfx('back'); close(); }; });
+  }
+  const i = BOSSES.findIndex(x => x.id === id), b = BOSSES[i];
+  dialog(`<img class="hero rise ${n ? '' : 'shade'}" src="${ICON[b.img]}" alt="" /><h2 class="rise">${n ? b.name : '???'}</h2>
+    ${n ? `<p class="rise quote">"${BOSS_LINES[i].taunt}"</p><p class="rise dim">Smashed ${fmt(n)} time${n > 1 ? 's' : ''}. Guards ${WORLDS[i].name}.</p>` : `<p class="rise dim">Unknown boss. Waiting at the end of ${WORLDS[i].name}.</p>`}
+    <button class="btn btn-alt rise full" data-x="no">Close</button>`, (p, close) => { p.querySelector('[data-x=no]').onclick = () => { sfx('back'); close(); }; });
+}
+
+// ---- archer style
+function styleHtml() {
+  const st = d().style;
+  const btn = (kind, o, owned, on, gem) => on ? `<span class="tick">${icon('check')}</span>`
+    : owned ? `<button class="btn btn-buy claim" data-style="${kind}:${o.id}">USE</button>`
+      : `<button class="btn btn-buy" data-style="${kind}:${o.id}">${icon(gem ? 'gem' : 'coin')}${fmt(o.cost)}</button>`;
+  const outfits = OUTFITS.map(o => `<div class="style-item ${st.outfit === o.id ? 'on' : ''}"><span class="swatch" style="background:${o.tunic};border-color:${o.hood}"></span><strong>${o.name}</strong>${btn('outfit', o, st.outfits.includes(o.id), st.outfit === o.id, true)}</div>`).join('');
+  const hats = HATS.map(o => `<div class="style-item ${st.hat === o.id ? 'on' : ''}">${icon(o.icon)}<strong>${o.name}</strong>${btn('hat', o, st.hats.includes(o.id), st.hat === o.id, true)}</div>`).join('');
+  const pets = PETS.map(o => `<div class="style-item ${st.pet === o.id ? 'on' : ''}">${icon(o.icon)}<strong>${o.name}</strong>${btn('pet', o, st.pets.includes(o.id), st.pet === o.id, false)}</div>`).join('');
+  return `<p class="dim rise center">Gems come from chests and season tiers. Your archer on the home screen shows the look.</p>
+    <div class="card rise"><h3>Outfit</h3><div class="style-grid">${outfits}</div></div>
+    <div class="card rise"><h3>Hat</h3><div class="style-grid">${hats}</div></div>
+    <div class="card rise"><h3>Pet</h3><p class="dim small">A pet cancels the first penalty of each run.</p><div class="style-grid">${pets}</div></div>
+    <div class="card rise"><h3>Arrow trail</h3><p class="dim small">Trails follow your arrow type. Change arrows in the Shop.</p><button class="btn btn-alt full" data-go="shop">Open shop</button></div>`;
+}
+function pickStyle(key, btn) {
+  const [kind, id] = key.split(':'), st = d().style;
+  const list = kind === 'outfit' ? OUTFITS : kind === 'hat' ? HATS : PETS, owned = st[kind + 's'], o = list.find(x => x.id === id);
+  if (!owned.includes(id)) {
+    const gem = kind !== 'pet';
+    if ((gem ? d().gems : d().coins) < o.cost) { sfx('deny'); buzz('error'); shake(btn); toast(gem ? `${icon('gem')} You need ${o.cost - d().gems} more gems. Open chests to find them.` : `${icon('coin')} You need ${fmt(o.cost - d().coins)} more coins.`); return; }
+    const before = d().coins;
+    if (gem) d().gems -= o.cost; else d().coins -= o.cost;
+    owned.push(id); sfx('buy'); buzz('success'); refreshCoins(before);
+  } else sfx('click');
+  st[kind] = id; store.save();
+  game.applyStyle(); renderExtra();
+  if (!reduceMotion) animate('.style-item.on', { scale: [1.08, 1], duration: 320, ease: 'outBack' });
+}
+
+// ---- weekend event
+function eventDialog() {
+  const ev = currentEvent();
+  sfx('click');
+  if (!ev) {
+    const n = eventDaysAway();
+    return dialog(`<img class="hero rise" src="${ICON.tent}" alt="" /><h2 class="rise">Weekend Event</h2>
+      <p class="rise dim">A special run opens every Friday, Saturday and Sunday: Giant Harvest, Wind Storm, Bomb Squad or Boss Rush. The first run each weekend pays a chest.</p>
+      <div class="goal-box rise">${icon('hourglass')}<div><strong>Opens in ${n} day${n === 1 ? '' : 's'}</strong><small>Friday to Sunday</small></div></div>
+      <button class="btn btn-alt rise full" data-x="no">OK</button>`, (p, close) => { p.querySelector('[data-x=no]').onclick = () => { sfx('back'); close(); }; });
+  }
+  dialog(`<p class="over-mode rise">Weekend event</p><img class="hero rise" src="${ICON.tent}" alt="" /><h2 class="rise">${ev.name}</h2>
+    <p class="rise dim">${ev.desc}</p>
+    <div class="goal-box rise">${icon('gift')}<div><strong>${d().event.played ? 'Chest collected' : 'First run pays a chest'}</strong><small>Best this weekend: ${fmt(d().event.best)}</small></div></div>
+    <button class="btn btn-play rise" data-x="ok">PLAY</button>
+    <button class="btn btn-ghost rise full" data-x="no">${t('cancel')}</button>`,
+  (p, close) => {
+    p.querySelector('[data-x=no]').onclick = () => { sfx('back'); close(); };
+    p.querySelector('[data-x=ok]').onclick = () => { buzz('medium'); startGame('event', null, ev.id); };
+  });
+}
+
+/** One reminder a day at 18:00 for the next three days; rescheduled on every launch and claim. */
+function syncReminder() {
+  const next = calReward(calendarState().claimed ? (d().daily.streak % CAL_DAYS) + 1 : calendarState().day);
+  setReminders(d().settings.remind, [
+    { title: 'Fruit Archer', body: `Your day ${d().daily.streak + 1} reward (${next.coins} coins) and 3 new quests are ready.` },
+    { title: 'Your streak is about to end', body: d().daily.freezes ? 'A streak freeze is covering you. Come back and keep it going.' : 'Play today to keep your login streak.' },
+    { title: 'The orchard misses you', body: 'New quests and a fresh daily challenge are waiting.' },
+  ]).then(ok => { if (!ok && d().settings.remind) { d().settings.remind = false; store.save(); if (current === 'settings') renderSettings(); toast('Notifications are not allowed on this device.'); } });
 }
 
 // ---------------------------------------------------------------- HUD
@@ -612,19 +860,26 @@ const hud = {
     $('#hudGoal').hidden = !stage;
     $('#hudGoal').classList.remove('done');
     $('#hudWind').hidden = true;
+    $('#hudGhost').hidden = true;
     $('#bossBar').hidden = true;
     $('#feverWrap').hidden = mode === 'tutorial';
     $('#hudCombo').classList.remove('on');
     $('#hudScore').textContent = '0';
     $('#chips').innerHTML = '';
     this.chips = {};
-    $('#hudLevel').textContent = mode === 'tutorial' ? t('tutorial') : stage ? t('stage', { n: stage.id }) : t('level', { n: 1 });
+    $('#hudLevel').textContent = mode === 'event' ? (currentEvent() || { name: 'Event' }).name : mode === 'tutorial' ? t('tutorial') : stage ? t('stage', { n: stage.id }) : t('level', { n: 1 });
     $('.fever-label').textContent = t('fever');
   },
   update(g) {
     if (g.state === 'attract' || g.state === 'over') return;
     this.set('score', g.score, v => { $('#hudScore').textContent = fmt(v); });
     if (g.scorePulse > 0.9) pulse($('#hudScore'), 1.14);
+    const gd = g.ghostDelta;
+    if (gd != null) this.set('ghost', Math.round(gd / 10) * 10, v => {
+      const el = $('#hudGhost'); el.hidden = false;
+      $('#hudGhostVal').textContent = (v >= 0 ? '+' : '') + fmt(v) + ' vs best';
+      el.classList.toggle('ahead', v >= 0);
+    });
     const rule = g.rule;
     if (rule !== 'none') {
       const stat = rule === 'time' ? Math.ceil(g.timeLeft) : rule === 'lives' ? g.lives : g.arrowsLeft;
@@ -694,7 +949,12 @@ function pulse(el, s) {
 // ---------------------------------------------------------------- game over
 function onGameOver(r) {
   lastResult = r;
-  if (r.stage) { d().fails[r.stage.id] = r.won ? 0 : (d().fails[r.stage.id] || 0) + 1; store.save(); }
+  if (r.stage) {
+    d().fails[r.stage.id] = r.won ? 0 : (d().fails[r.stage.id] || 0) + 1;
+    // first clear of every 5th stage pays a chest
+    if (r.won && r.newStars === r.stars && r.stage.id % 5 === 0) { d().chests++; r.chest = true; }
+    store.save();
+  }
   const kind = r.stage ? (r.won ? (r.stage.boss >= 0 ? 'boss' : r.stars === 3 ? 'perfect' : 'clear') : '') : r.isBest ? 'best' : '';
   if (kind && !reduceMotion) cheer(kind).then(() => showOver(r)); else showOver(r);
 }
@@ -730,7 +990,7 @@ function cheer(kind) {
 function showOver(r) {
   document.body.classList.remove('fever-on');
   const st = r.stage;
-  $('#overMode').textContent = st ? `${worldName(st)} · ${t('stage', { n: st.id })}` : r.mode === 'daily' ? t('dailyTitle') : t('mode_' + r.mode);
+  $('#overMode').textContent = st ? `${worldName(st)} · ${t('stage', { n: st.id })}` : r.mode === 'daily' ? t('dailyTitle') : r.mode === 'event' ? r.event.name : t('mode_' + r.mode);
   $('#bestRibbon').hidden = !r.isBest;
   const starsEl = $('#overStars');
   starsEl.hidden = !st;
@@ -742,17 +1002,24 @@ function showOver(r) {
   const s = d().season, into = s.tier >= SEASON.tiers ? SEASON.xpPerTier : s.xp % SEASON.xpPerTier;
   $('#overSeason').innerHTML = `${icon('gift')}<div class="bar"><div id="overXpBar" style="transform:scaleX(0)"></div><span>${t('tier', { n: s.tier })} · ${t('seasonXp', { n: r.season.xp })}</span></div>`;
   const n = claimable(), note = $('#overNote');
-  note.hidden = !n; note.innerHTML = n ? `${icon('trophy')} ${t('missionReady', { n })}` : '';
+  const notes = [];
+  if (st && r.won && st.boss >= 0 && BOSS_LINES[st.boss]) notes.push(`<span class="quote">${icon(BOSSES[st.boss].img)} "${BOSS_LINES[st.boss].defeat}"</span>`);
+  if (r.chest || r.eventChest) notes.push(`<button class="note-btn" data-hub="chest">${icon('gift')} You earned a chest. Tap to open.</button>`);
+  if (r.skill) notes.push(`<span>${icon('sparkles')} ${r.skill} skill shot${r.skill > 1 ? 's' : ''}</span>`);
+  if (questsReady()) notes.push(`<button class="note-btn" data-hub="quests">${icon('scroll')} Daily quest ready to claim</button>`);
+  if (n) notes.push(`<span>${icon('trophy')} ${t('missionReady', { n })}</span>`);
+  note.hidden = !notes.length; note.innerHTML = notes.join('');
   $('#overHint').innerHTML = st && !r.won ? hintBox(st) : '';
   $('#overScore').textContent = '0'; $('#overCoins').textContent = '+0';
 
   const nextStage = st && r.won ? stageById(st.id + 1) : null;
   const again = $('#againBtn');
   again.hidden = r.mode === 'daily';
+  if (r.season.ups.length) { d().gems += r.season.ups.length * 10; store.save(); }
   again.textContent = st ? (nextStage ? t('next') : r.won ? t('map') : t('retry')) : t('playAgain');
   again.onclick = () => {
     sfx('click'); buzz('medium');
-    if (!st) return startGame(r.mode);
+    if (!st) return startGame(r.mode, null, r.event && r.event.id);
     if (nextStage) { game.toMenu(); current = 'map'; return stageIntro(nextStage.id); }
     if (r.won) { game.toMenu(); return show('map'); }
     startGame('stage', st);
@@ -786,7 +1053,7 @@ function showOver(r) {
   r.season.ups.forEach((u, i) => setTimeout(() => {
     if (current !== 'over') return;
     sfx('level'); buzz('success'); pop($('#overSeason'));
-    toast(`${icon('gift')} ${t('tierUp', { n: u.tier })} ${icon('coin')} +${u.coins}${u.tier === SEASON.skinTier ? ' · ' + t('skinNew') : ''}`);
+    toast(`${icon('gift')} ${t('tierUp', { n: u.tier })} ${icon('coin')} +${u.coins}${u.tier === SEASON.skinTier ? ' · ' + t('skinNew') : ''} ${icon('gem')} +10`);
   }, 1500 + i * 1300));
 }
 
@@ -895,6 +1162,18 @@ document.addEventListener('click', e => {
     selectedMode = ds.mode; sfx('click'); buzz('light'); renderHome(); pop($(`[data-mode="${ds.mode}"]`));
     if (!reduceMotion) animate('#modeDesc', { opacity: [0, 1], translateY: [6, 0], duration: 260, ease: 'outQuint' });
   }
+  else if (ds.hub) {
+    if (current === 'over') game.toMenu();
+    if (ds.hub === 'chest') { if (current === 'over') show('home', { quiet: true }); chestDialog(); }
+    else if (ds.hub === 'event') eventDialog();
+    else { sfx('click'); openExtra(ds.hub); }
+  }
+  else if (ds.calclaim) doCalClaim(b);
+  else if (ds.freeze) buyFreeze(b);
+  else if (ds.qclaim) claimQuest(ds.qclaim, b);
+  else if (ds.qchest) claimQuestChest();
+  else if (ds.book) bookEntry(ds.book);
+  else if (ds.style) pickStyle(ds.style, b);
   else if (ds.stage) stageIntro(+ds.stage);
   else if (ds.arrow) {
     d().arrows.equipped = ds.arrow; store.save(); sfx('click'); buzz('light');
@@ -916,6 +1195,7 @@ document.addEventListener('click', e => {
     if (ds.toggle === 'lefty') document.body.classList.toggle('lefty', s.lefty);
     b.classList.toggle('on', s[ds.toggle]); b.setAttribute('aria-checked', s[ds.toggle]);
     audio.syncMusic(); sfx('click'); if (ds.toggle === 'haptics') buzz('medium');
+    if (ds.toggle === 'remind') syncReminder();
   }
 });
 
@@ -950,6 +1230,11 @@ document.body.classList.toggle('lefty', !!d().settings.lefty);
 const bootT0 = performance.now();
 const bootBar = p => { $('#bootFill').style.transform = `scaleX(${p})`; $('#bootArrow').style.transform = `translateX(${p * 100}%)`; };
 $$('#boot .b-logo span').forEach(sp => { sp.innerHTML = [...sp.textContent].map(c => `<b>${c}</b>`).join(''); });
+const BOOT_STEPS = ['Stringing the bow', 'Picking fruit', 'Waking the pets', 'Ready'];
+let bootStep = 0;
+const bootTick = setInterval(() => { const el = $('#bootText'); if (!el || ++bootStep >= BOOT_STEPS.length - 1) return clearInterval(bootTick); el.firstChild.textContent = BOOT_STEPS[bootStep]; }, 480);
+if (!reduceMotion) animate('#boot .b-target', { scale: [0, 1], rotate: [-90, 0], duration: 520, ease: 'outBack' });
+else $('#boot .b-target').style.transform = 'none';
 if (!reduceMotion) animate('#boot .b-logo b', { translateY: [-70, 0], rotate: [() => (Math.random() - 0.5) * 60, 0], opacity: [0, 1], duration: 650, delay: stagger(50), ease: 'outElastic(1, .6)' });
 
 Promise.all([
@@ -962,13 +1247,19 @@ Promise.all([
   if (import.meta.env.DEV) { window.__game = game; window.__store = store; }
   if (isNative) import('@capacitor/splash-screen').then(m => m.SplashScreen.hide()).catch(() => {});
   bootBar(1);
-  await sleep(Math.max(350, (reduceMotion ? 500 : 1500) - (performance.now() - bootT0)));
+  clearInterval(bootTick); $('#bootText').textContent = 'Ready!';
+  if (!reduceMotion) {
+    // the arrow thuds into the bullseye, then the logo bumps
+    animate('#bootShot', { translateX: ['-140vw', '0vw'], rotate: [-28, -28], duration: 300, ease: 'inQuad', onComplete: () => { sfx('hit'); animate('#boot .b-target', { scale: [1.25, 1], duration: 420, ease: 'outElastic(1, .5)' }); } });
+    animate('#boot .b-logo', { scale: [1, 1.08, 1], duration: 420, delay: 300, ease: 'outQuad' });
+  }
+  await sleep(Math.max(750, (reduceMotion ? 500 : 2000) - (performance.now() - bootT0)));
   show('home');
   const boot = $('#boot');
   if (reduceMotion) boot.remove();
   else {
     sfx('whoosh');
-    animate('#boot .b-track, #boot .b-text', { opacity: 0, duration: 160 });
+    animate('#boot .b-track, #boot .b-text, #boot .b-target', { opacity: 0, duration: 160 });
     animate('#boot .b-logo', { scale: [1, 1.25], opacity: [1, 0], duration: 380, ease: 'inQuad' });
     await animate(boot, { opacity: [1, 0], duration: 420, delay: 140, ease: 'inQuad' }).then();
     boot.remove();

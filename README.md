@@ -86,3 +86,6 @@ install in place, add three repository secrets (Settings → Secrets and variabl
 | `src/i18n.js` | all player-facing text |
 | `src/meta.js` | weekly missions, season track, daily challenge bookkeeping |
 | `legacy/` | the original v7 browser game, kept for reference |
+
+## New in v11
+Login calendar with streak freezes, daily quests, reward chests, archer outfits/hats, pets, Fruit Book, rotating weekend event (incl. Boss Rush), named skill shots, Time Attack ghost, boss dialogue, weekly records card, notification dots and an optional daily reminder (`@capacitor/local-notifications`).

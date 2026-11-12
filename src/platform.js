@@ -35,3 +35,26 @@ export function onAppPause(handler) {
 }
 
 export function exitApp() { if (isNative) App.exitApp(); }
+
+/**
+ * Schedule (or clear) the daily return reminders. `msgs[i]` fires at 18:00, i+1 days from now.
+ * Resolves false when the player turned reminders on but permission was refused.
+ */
+export async function setReminders(on, msgs) {
+  if (!isNative) return true;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const ids = msgs.map((_, i) => ({ id: 100 + i }));
+    await LocalNotifications.cancel({ notifications: ids });
+    if (!on) return true;
+    let perm = await LocalNotifications.checkPermissions();
+    if (perm.display !== 'granted') perm = await LocalNotifications.requestPermissions();
+    if (perm.display !== 'granted') return false;
+    const notifications = msgs.map((m, i) => {
+      const at = new Date(); at.setDate(at.getDate() + i + 1); at.setHours(18, 0, 0, 0);
+      return { id: 100 + i, title: m.title, body: m.body, schedule: { at, allowWhileIdle: true } };
+    });
+    await LocalNotifications.schedule({ notifications });
+    return true;
+  } catch { return false; }
+}
