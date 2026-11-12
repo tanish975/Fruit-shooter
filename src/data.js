@@ -171,3 +171,35 @@ export function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+// ---- Endless Peaks: generated stages after stage 40. Same layout every attempt (seeded by id). ----
+export const ENDLESS_NAME = 'Endless Peaks';
+export function stageById(id) {
+  if (id <= STAGES.length) return STAGES[id - 1];
+  const e = id - STAGES.length - 1, tier = 4 + Math.floor(e / 10), i = e % 10;
+  const [goal, limit, amount, n, grow] = SHAPES[i];
+  const base = Math.round((260 + tier * 110 + i * 28) * (limit === 'arrows' ? 0.7 : 1) * (amount / 45 > 1.2 ? 1.3 : 1) / 10) * 10;
+  const mods = ['wind', 'bird', 'shield', 'dodge', 'balloon'];
+  if (i === 7) mods.push('bombs');
+  return {
+    id, world: Math.floor(e / 10) % 4, tier, endless: true, goal, n: goal === 'score' ? base : n + grow * Math.min(tier, 7),
+    time: limit === 'time' ? amount : 0, arrows: limit === 'arrows' ? amount + (goal === 'fruits' ? 0 : 3) : 0,
+    lvl: Math.min(12, 7 + Math.floor(e / 5)), mods, boss: goal === 'boss' ? Math.floor(e / 10) % 4 : -1,
+    stars: goal === 'score' ? [base, Math.round(base * 1.6 / 10) * 10, Math.round(base * 2.4 / 10) * 10] : [0, base, Math.round(base * 1.7 / 10) * 10],
+  };
+}
+
+// ---- Difficulty. Every number the player feels is scaled from here. ----
+// speed: fruit speed. spawn: gap between waves. bomb: bomb chance. time/arrows: stage and mode limits. lives: extra lives.
+// guide: aiming guide length. hit: arrow hit radius. score: points multiplier. boss: boss health. early: hazards appear this many levels sooner.
+export const DIFFS = [
+  { id: 'easy', name: 'Easy', color: '#7ee787', speed: 0.82, spawn: 1.2, bomb: 0.5, time: 1.25, arrows: 1.3, lives: 1, guide: 1.4, hit: 1.18, score: 0.8, boss: 0.7, early: -2,
+    desc: 'Slower fruit, a long aiming guide, extra time and arrows, few bombs.' },
+  { id: 'moderate', name: 'Moderate', color: '#5ce1ff', speed: 1, spawn: 1, bomb: 1, time: 1, arrows: 1, lives: 0, guide: 1, hit: 1, score: 1, boss: 1, early: 0,
+    desc: 'The game as designed. A fair fight.' },
+  { id: 'hard', name: 'Hard', color: '#ffb02e', speed: 1.15, spawn: 0.86, bomb: 1.35, time: 0.9, arrows: 0.9, lives: 0, guide: 0.7, hit: 0.94, score: 1.3, boss: 1.3, early: 1,
+    desc: 'Faster fruit, more bombs, a short guide, tighter limits. Scores count 1.3x.' },
+  { id: 'intense', name: 'Intense', color: '#ff4d6d', speed: 1.3, spawn: 0.72, bomb: 1.7, time: 0.8, arrows: 0.8, lives: -1, guide: 0.4, hit: 0.88, score: 1.7, boss: 1.6, early: 3,
+    desc: 'Everything at once, almost no guide, one life fewer. Scores count 1.7x.' },
+];
+export const diffById = id => DIFFS.find(d => d.id === id) || DIFFS[1];

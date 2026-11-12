@@ -1,5 +1,5 @@
 // Fruit Archer — gameplay, physics and canvas rendering.
-import { FRUITS, SPECIALS, POWERUPS, THEMES, SKINS, ARROWS, BOSSES, WORLDS, mulberry32 } from './data.js';
+import { FRUITS, SPECIALS, POWERUPS, THEMES, SKINS, ARROWS, BOSSES, WORLDS, mulberry32, diffById } from './data.js';
 import { store } from './store.js';
 import { sfx, audio } from './audio.js';
 import { buzz } from './platform.js';
@@ -49,7 +49,7 @@ export class Game {
     this.leaves = Array.from({ length: 12 }, () => ({ x: Math.random(), y: Math.random(), r: rand(0, TAU), s: rand(0.6, 1.2), p: rand(0, TAU) }));
     this.aim = { active: false, id: -1, sx: 0, sy: 0, cx: 0, cy: 0, power: 0, angle: -Math.PI / 2 };
     this.idleAngle = -Math.PI / 2;
-    this.skin = SKINS[0]; this.arrowDef = ARROWS[0];
+    this.skin = SKINS[0]; this.arrowDef = ARROWS[0]; this.diff = diffById('moderate');
     this.clear();
     this.resize();
     this.bindInput();
@@ -95,6 +95,8 @@ export class Game {
   }
 
   setTheme(i) {
+    const fixed = store.data.settings.scene;
+    if (fixed !== 'auto' && fixed != null) i = +fixed || 0;
     i %= THEMES.length;
     if (i === this.themeIndex) return;
     this.themeIndex = i;
@@ -106,12 +108,21 @@ export class Game {
   paintBackground(cv, th) {
     cv.width = this.canvas.width; cv.height = this.canvas.height;
     const c = cv.getContext('2d'), { W, H } = this;
+    const photo = this.img['bg_' + th.name];
+    if (photo && photo.width) {
+      // cover the screen, anchored to the bottom so the meadow always sits under the archer
+      const s = Math.max(cv.width / photo.width, cv.height / photo.height), w = photo.width * s, h = photo.height * s;
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.drawImage(photo, (cv.width - w) / 2, cv.height - h, w, h);
+      c.globalAlpha = th.name === 'night' ? 0 : 0.08; c.fillStyle = '#1b1036'; c.fillRect(0, 0, cv.width, cv.height); c.globalAlpha = 1;
+      this.photoBg = true;
+      return;
+    }
+    this.photoBg = false;
     c.setTransform(this.scale * this.dpr, 0, 0, this.scale * this.dpr, 0, 0);
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    const sky = c.createLinearGradient(0, 0, 0, H * 0.8);
-    sky.addColorStop(0, th.sky[0]); sky.addColorStop(0.55, th.sky[1]); sky.addColorStop(1, th.sky[2]);
-    c.fillStyle = sky; c.fillRect(0, 0, W, H);
+    c.fillStyle = th.sky[1]; c.fillRect(0, 0, W, H);
     if (th.stars) {
       c.fillStyle = '#fff';
       for (let i = 0; i < 90; i++) {
@@ -121,9 +132,6 @@ export class Game {
       c.globalAlpha = 1;
     }
     const sx = W * 0.74, sy = H * th.sunY;
-    const glow = c.createRadialGradient(sx, sy, 10, sx, sy, 230);
-    glow.addColorStop(0, th.sun + 'cc'); glow.addColorStop(0.25, th.sun + '55'); glow.addColorStop(1, th.sun + '00');
-    c.fillStyle = glow; c.fillRect(sx - 230, sy - 230, 460, 460);
     c.fillStyle = th.sun; c.beginPath(); c.arc(sx, sy, 38, 0, TAU); c.fill();
     if (th.name === 'night') { c.fillStyle = th.sky[0]; c.globalAlpha = 0.9; c.beginPath(); c.arc(sx + 15, sy - 9, 32, 0, TAU); c.fill(); c.globalAlpha = 1; }
     // rolling orchard hills, back to front
@@ -186,7 +194,7 @@ export class Game {
   updateAim() {
     const a = this.aim, px = a.sx - a.cx, py = a.sy - a.cy, len = Math.hypot(px, py);
     const was = a.power;
-    a.power = clamp((len - 10) / 150, 0, 1);
+    a.power = clamp((len - 10) / (150 / (store.data.settings.sens || 1)), 0, 1);
     if (len > 6) {
       let ang = Math.atan2(py, px);
       if (ang > -0.14) ang = px >= 0 ? -0.14 : -Math.PI + 0.14; // the bow can't shoot into the ground
@@ -204,10 +212,12 @@ export class Game {
     this.clear();
     this.mode = mode; this.state = 'playing'; this.stage = stage;
     const head = store.up('head');
+    const df = this.diff = diffById(mode === 'daily' || mode === 'tutorial' ? 'moderate' : store.data.settings.diff);
+    this.revived = false; this.offerDone = false;
     this.rule = mode === 'tutorial' ? 'none' : mode === 'survival' ? 'lives' : mode === 'precision' || (stage && stage.arrows) ? 'arrows' : 'time';
-    this.lives = 3 + head;
-    this.timeLeft = (stage ? stage.time : 60) + head * 5;
-    this.arrowsLeft = (stage ? stage.arrows : 15) + head * 2;
+    this.lives = Math.max(1, 3 + df.lives) + head;
+    this.timeLeft = Math.round((stage ? stage.time : 60) * df.time) + head * 5;
+    this.arrowsLeft = Math.round((stage ? stage.arrows : 15) * df.arrows) + head * 2;
     this.skin = SKINS.find(s => s.id === store.data.skins.equipped) || SKINS[0];
     this.arrowDef = ARROWS.find(a => a.id === store.data.arrows.equipped) || ARROWS[0];
     if (mode === 'tutorial') this.arrowDef = ARROWS[0];
@@ -231,7 +241,7 @@ export class Game {
   get inFever() { return this.feverTime > 0; }
   modOn(m) {
     if (this.state === 'attract' || this.mode === 'tutorial') return false;
-    return this.stage ? this.stage.mods.includes(m) : this.level >= MOD_LEVEL[m];
+    return this.stage ? this.stage.mods.includes(m) : this.level >= MOD_LEVEL[m] - this.diff.early;
   }
 
   goalProg() {
@@ -251,7 +261,7 @@ export class Game {
   chooseKind() {
     const lucky = 1 + store.up('lucky') * 0.1, playing = this.state === 'playing';
     const r = this.rnd(), storm = this.stage && this.stage.mods.includes('bombs');
-    if (playing && (this.level >= 2 || storm) && !this.inFever && r < (storm ? 0.3 : Math.min(0.2, 0.05 + this.level * 0.018))) return 'bomb';
+    if (playing && (this.level >= 2 || storm) && !this.inFever && r < (storm ? 0.3 : Math.min(0.2, 0.05 + this.level * 0.018)) * this.diff.bomb) return 'bomb';
     const r2 = this.rnd();
     if (playing && this.level >= 3 && r2 < 0.012 * lucky) return 'gem';
     if (r2 < 0.05 * lucky) return 'star';
@@ -273,7 +283,7 @@ export class Game {
 
   toss(kind, x, tx, apex) {
     const f = this.makeFruit(kind), { H } = this;
-    const sp = this.state === 'attract' ? 0.8 : Math.min(1.7, 1 + (this.level - 1) * 0.055);
+    const sp = this.state === 'attract' ? 0.8 : Math.min(1.7, 1 + (this.level - 1) * 0.055) * this.diff.speed;
     f.g = FRUIT_G * sp * sp;
     f.x = x; f.y = H + f.r + 4;
     f.vy = -Math.sqrt(2 * f.g * (f.y - apex));
@@ -284,7 +294,7 @@ export class Game {
 
   flyBy(kind) {
     const f = this.makeFruit(kind), dir = this.rnd() < 0.5 ? 1 : -1;
-    const sp = Math.min(1.6, 1 + (this.level - 1) * 0.05);
+    const sp = Math.min(1.6, 1 + (this.level - 1) * 0.05) * (this.state === 'attract' ? 1 : this.diff.speed);
     f.x = dir > 0 ? -f.r : this.W + f.r; f.y = this.R(this.H * 0.2, this.H * 0.45);
     f.vx = dir * this.R(150, 210) * sp; f.vy = -this.R(110, 160); f.g = 130;
     this.fruits.push(f);
@@ -337,7 +347,7 @@ export class Game {
   spawnBoss() {
     const idx = this.stage ? this.stage.boss : this.bossCount % BOSSES.length;
     this.bossCount++;
-    const def = BOSSES[idx], hp = this.stage ? 10 + this.stage.world * 5 : 8 + this.bossCount * 4;
+    const def = BOSSES[idx], hp = Math.max(4, Math.round((this.stage ? 10 + (this.stage.tier ?? this.stage.world) * 5 : 8 + this.bossCount * 4) * this.diff.boss));
     this.boss = { def, x: this.W / 2, tx: this.W / 2, y: -90, r: def.r, hp, max: hp, t: 0, flash: 0, bombT: 3, life: this.stage ? 1e9 : 30, img: this.img[def.img] };
     this.say(def.name + '!', t('bossSub'), '#ff8a1f', 2);
     this.snd('boss'); buzz('heavy'); this.shake = 14;
@@ -422,7 +432,7 @@ export class Game {
   // ------------------------------------------------------------------ scoring
   award(base, x, y, { perfect = false, skew = 1, color = '#fff' } = {}) {
     const mult = this.comboMult * (this.effects.double > 0 ? 2 : 1) * (this.inFever ? 2 : 1) * (perfect ? 2 : 1) * skew;
-    const pts = Math.round(base * mult);
+    const pts = Math.round(base * mult * (this.live ? this.diff.score : 1));
     this.score += pts; this.scorePulse = 1;
     this.text(x, y - 18, '+' + pts, perfect ? '#ffe14d' : color, perfect || pts >= 100 ? 28 : 22);
     return pts;
@@ -633,6 +643,13 @@ export class Game {
   // ------------------------------------------------------------------ end of run
   end() {
     if (this.state !== 'playing') return;
+    const lost = this.stage ? this.goalProg()[0] < this.stage.n : this.rule === 'lives';
+    if (lost && !this.offerDone && this.mode !== 'daily' && this.hooks.onOffer) {
+      // one chance per run to buy a little more time, arrows or a life
+      this.offerDone = true; this.state = 'offer'; this.aim.active = false; this.aim.power = 0;
+      const [cur, n] = this.stage ? this.goalProg() : [0, 0];
+      return this.hooks.onOffer({ rule: this.rule, cost: this.stage ? 40 + this.stage.id * 2 : 60, cur, n });
+    }
     this.state = 'ending'; this.endT = 1.25; this.aim.active = false;
     audio.setIntense(false);
     if (this.stage) {
@@ -644,6 +661,18 @@ export class Game {
     this.say(t(this.rule === 'time' ? 'timesUp' : this.rule === 'lives' ? 'gameOver' : 'outArrows'), null, '#fff6e0', 1.2);
     sfx('over'); buzz('heavy');
   }
+
+  /** Accept the continue offer: back into the run with a top-up. */
+  revive() {
+    if (this.state !== 'offer') return;
+    this.revived = true;
+    if (this.rule === 'time') this.timeLeft = 15; else if (this.rule === 'arrows') this.arrowsLeft = 5; else this.lives = 1;
+    for (const f of this.fruits) if (f.kind !== 'boss' && !f.hover) f.dead = true;
+    this.state = 'playing'; this.last = performance.now(); this.spawnT = 0.8;
+    this.say(t('secondWind'), null, '#a6f06a', 1.2); sfx('power'); buzz('success'); this.confetti(20);
+  }
+  /** Decline the continue offer. */
+  giveUp() { if (this.state === 'offer') { this.state = 'playing'; this.last = performance.now(); this.end(); } }
 
   finish() {
     this.state = 'over';
@@ -669,7 +698,7 @@ export class Game {
     store.save();
     if (isBest || stars > 0) this.confetti(stars === 3 || isBest ? 90 : 40);
     this.hooks.onGameOver({
-      mode: this.mode, stage: st, stars, newStars, won: this.won, score: this.score, best: Math.max(prevBest, this.score), prevBest, isBest, coins, season,
+      diff: this.diff.id, revived: this.revived, mode: this.mode, stage: st, stars, newStars, won: this.won, score: this.score, best: Math.max(prevBest, this.score), prevBest, isBest, coins, season,
       fruits: r.fruits, perfects: r.perfects, maxCombo: this.maxCombo, level: this.level, skewer: r.skewer,
       accuracy: r.shots ? Math.min(100, Math.round((r.hits / r.shots) * 100)) : 0,
     });
@@ -681,7 +710,7 @@ export class Game {
     const dt = Math.min(0.034, (now - this.last) / 1000);
     this.last = now;
     if (dt <= 0) return;
-    if (this.state !== 'paused') this.update(dt);
+    if (this.state !== 'paused' && this.state !== 'offer') this.update(dt);
     this.draw();
     this.hooks.onFrame?.(this);
   }
@@ -744,7 +773,7 @@ export class Game {
       if ((this.spawnT -= dt) <= 0 && this.fruits.length < 12) {
         this.spawnWave();
         const L = this.level;
-        const base = this.state === 'attract' ? 1.5 : Math.max(0.62, 1.55 - L * 0.085) * (this.boss ? 1.5 : 1) * (this.inFever ? 0.7 : 1);
+        const base = this.state === 'attract' ? 1.5 : Math.max(0.62, 1.55 - L * 0.085) * (this.boss ? 1.5 : 1) * (this.inFever ? 0.7 : 1) * this.diff.spawn;
         this.spawnT = base * this.R(0.8, 1.2);
       }
     }
@@ -793,7 +822,7 @@ export class Game {
     if (this.boss) this.updateBoss(this.boss, dt, fdt, playing);
 
     // arrows
-    const hitBase = 1 + store.up('tips') * 0.07;
+    const hitBase = (1 + store.up('tips') * 0.07) * (playing ? this.diff.hit : 1);
     const born = [];
     for (const a of this.arrows) {
       const px = a.x, py = a.y;
@@ -950,7 +979,7 @@ export class Game {
 
     // clouds
     c.fillStyle = th.cloud;
-    for (const cl of this.clouds) {
+    for (const cl of this.photoBg ? [] : this.clouds) {
       const x = cl.x * W, y = cl.y * H, s = cl.s;
       c.beginPath();
       c.ellipse(x, y, 46 * s, 15 * s, 0, 0, TAU); c.ellipse(x - 20 * s, y - 9 * s, 22 * s, 15 * s, 0, 0, TAU); c.ellipse(x + 14 * s, y - 13 * s, 26 * s, 19 * s, 0, 0, TAU);
@@ -1020,6 +1049,17 @@ export class Game {
     }
 
     for (const f of this.fruits) this.drawFruit(c, f);
+    if (store.data.settings.marks) for (const f of this.fruits) {
+      // colour-independent "do not shoot" marker: a white-edged ring with a cross
+      const bird = f.carrier && f.carrier.type === 'bird' && !f.carrier.gone;
+      if (f.kind !== 'bomb' && !bird) continue;
+      const x = f.x, y = bird ? f.y - f.r - 30 : f.y, r = bird ? 34 : f.r + 8, k2 = r * 0.5;
+      for (const [w, col] of [[7, '#fff'], [3.5, '#111']]) {
+        c.strokeStyle = col; c.lineWidth = w; c.setLineDash(w > 4 ? [] : [9, 6]);
+        c.beginPath(); c.arc(x, y, r, 0, TAU); c.stroke(); c.setLineDash([]);
+        c.beginPath(); c.moveTo(x + r - k2, y - r + 1); c.lineTo(x + r + 4, y - r - k2 + 5); c.moveTo(x + r + 4, y - r + 1); c.lineTo(x + r - k2, y - r - k2 + 5); c.stroke();
+      }
+    }
     for (const s of this.sprites) {
       c.globalAlpha = clamp(2 - s.life * 1.4, 0, 1);
       c.save(); c.translate(s.x, s.y); if (s.flip) c.scale(-1, 1);
@@ -1104,9 +1144,7 @@ export class Game {
     }
     if (this.inFever) {
       const a = 0.32 + Math.sin(this.time * 10) * 0.08;
-      const g = c.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, `rgba(255,170,30,${a})`); g.addColorStop(0.18, 'rgba(255,170,30,0)'); g.addColorStop(0.8, 'rgba(255,90,30,0)'); g.addColorStop(1, `rgba(255,90,30,${a})`);
-      c.fillStyle = g; c.fillRect(0, 0, W, H);
+      c.globalAlpha = a; c.strokeStyle = '#ffb02e'; c.lineWidth = 14; c.strokeRect(0, 0, W, H); c.globalAlpha = 1;
     }
     if (this.flash > 0) { c.globalAlpha = Math.min(0.5, this.flash); c.fillStyle = this.flashColor; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
   }
@@ -1290,7 +1328,7 @@ export class Game {
     const speed = (640 + power * 760) * (1 + store.up('power') * 0.06) * (this.arrowDef.id === 'ice' && this.state === 'playing' ? 0.88 : 1);
     let x = this.bx + Math.cos(angle) * 30, y = this.by + Math.sin(angle) * 30;
     let vx = Math.cos(angle) * speed, vy = Math.sin(angle) * speed;
-    const n = Math.round((7 + power * 6) * (1 + store.up('sight') * 0.25)), step = 0.034;
+    const n = Math.round((7 + power * 6) * (1 + store.up('sight') * 0.25) * (this.state === 'playing' && this.mode !== 'tutorial' ? this.diff.guide : 1)), step = 0.034;
     for (let i = 0; i < n; i++) {
       vy += ARROW_G * step; vx += this.wind * step; x += vx * step; y += vy * step;
       if (i === 0) continue;

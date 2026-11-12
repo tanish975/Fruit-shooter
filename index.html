@@ -11,8 +11,28 @@
   <link rel="apple-touch-icon" href="./icon-192.png" />
   <link rel="manifest" href="./manifest.webmanifest" />
   <title>Fruit Archer</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1b1036; }
+    #boot { position: fixed; inset: 0; z-index: 100; background: #1b1036; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; color: #fff6e0; font-family: 'Lilita One', system-ui, sans-serif; }
+    #boot .b-logo { display: flex; flex-direction: column; align-items: center; line-height: 0.9; transform: rotate(-4deg); font-size: min(21vw, 96px); }
+    #boot .b-logo span:first-child { color: #ff5470; } #boot .b-logo span:last-child { color: #ffd23f; font-size: 0.86em; }
+    #boot .b-logo b { display: inline-block; font-weight: 400; opacity: 0; }
+    #boot .b-track { position: relative; width: min(64vw, 280px); height: 14px; border-radius: 7px; background: #2a1a52; border: 3px solid #0f0820; }
+    #boot .b-fill { height: 100%; border-radius: 4px; background: #ff8a1f; transform-origin: left; transform: scaleX(0); transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1); }
+    #boot .b-arrow { position: absolute; top: 50%; left: 0; width: 100%; height: 0; transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1); }
+    #boot .b-arrow::after { content: ''; position: absolute; left: -4px; top: -11px; border-top: 11px solid transparent; border-bottom: 11px solid transparent; border-left: 18px solid #fff6e0; }
+    #boot .b-text { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: #c9bfe6; min-height: 20px; }
+    #boot .b-dots i { display: inline-block; font-style: normal; animation: bdot 1s infinite; } #boot .b-dots i:nth-child(2) { animation-delay: 0.15s; } #boot .b-dots i:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bdot { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+    @media (prefers-reduced-motion: reduce) { #boot .b-logo b { opacity: 1; } }
+  </style>
 </head>
 <body>
+  <div id="boot">
+    <div class="b-logo"><span>FRUIT</span><span>ARCHER</span></div>
+    <div class="b-track"><div class="b-fill" id="bootFill"></div><div class="b-arrow" id="bootArrow"></div></div>
+    <div class="b-text" id="bootText">Stringing the bow<span class="b-dots"><i>.</i><i>.</i><i>.</i></span></div>
+  </div>
   <canvas id="game"></canvas>
 
   <!-- In-game HUD -->
@@ -41,6 +61,7 @@
   <section class="screen" id="home" hidden>
     <header class="topbar">
       <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
+      <button class="diff-chip" id="diffChip" aria-label="Difficulty"><i></i><span id="diffChipName"></span></button>
       <button class="season-chip" data-go="missions" data-mtab="season"><img data-icon="gift" alt="" /><span id="seasonChip">1</span><i><b id="seasonChipBar"></b></i></button>
       <button class="round-btn" data-go="settings" aria-label="Settings"><img data-icon="gear" alt="" /></button>
     </header>
@@ -115,7 +136,10 @@
       <span class="spacer"></span>
     </header>
     <div class="list">
+      <div class="card rise"><h3 data-i18n="difficulty">Difficulty</h3><div class="diffs" id="diffs"></div></div>
+      <div class="card rise"><h3 data-i18n="scene">Scenery</h3><div class="scenes" id="scenes"></div></div>
       <div class="card rise toggles" id="toggles"></div>
+      <div class="card rise"><h3 data-i18n="sens">Aim sensitivity</h3><div class="seg" id="sens"></div></div>
       <div class="card rise howto">
         <h3 data-i18n="howto">How to play</h3>
         <ul><li data-i18n="how1"></li><li data-i18n="how2"></li><li data-i18n="how3"></li><li data-i18n="how4"></li><li data-i18n="how5"></li></ul>
@@ -154,6 +178,7 @@
       <div class="earned rise" id="earned"><img data-icon="coin" alt="" /><span id="overCoins">+0</span></div>
       <div class="season-line rise" id="overSeason"></div>
       <p class="over-note rise" id="overNote" hidden></p>
+      <div class="full" id="overHint"></div>
       <button class="btn btn-play rise" id="againBtn">PLAY AGAIN</button>
       <div class="row rise">
         <button class="btn btn-alt" id="overAlt">Shop</button>
@@ -167,6 +192,7 @@
     <div class="panel" id="dialogPanel"></div>
   </section>
 
+  <div id="cheer"><div class="cheer-dim"></div><div class="rays" id="rays"></div><div class="cheer-box"><img class="cheer-ico" id="cheerIco" alt="" /><div class="cheer-small" id="cheerSmall"></div><div class="cheer-word" id="cheerWord"></div></div></div>
   <div id="wipe"></div>
   <div id="fx"></div>
   <div id="toast"></div>
