@@ -1,5 +1,5 @@
 // Fruit Archer — gameplay, physics and canvas rendering.
-import { FRUITS, SPECIALS, POWERUPS, THEMES, SKINS, ARROWS, BOSSES, WORLDS, mulberry32, diffById } from './data.js';
+import { FRUITS, SPECIALS, POWERUPS, THEMES, SKINS, ARROWS, BOSSES, WORLDS, mulberry32, diffById, OUTFITS, HATS, PETS, EVENTS, BOSS_LINES } from './data.js';
 import { store } from './store.js';
 import { sfx, audio } from './audio.js';
 import { buzz } from './platform.js';
@@ -50,6 +50,7 @@ export class Game {
     this.aim = { active: false, id: -1, sx: 0, sy: 0, cx: 0, cy: 0, power: 0, angle: -Math.PI / 2 };
     this.idleAngle = -Math.PI / 2;
     this.skin = SKINS[0]; this.arrowDef = ARROWS[0]; this.diff = diffById('moderate');
+    this.applyStyle();
     this.clear();
     this.resize();
     this.bindInput();
@@ -59,6 +60,15 @@ export class Game {
   }
 
   // ------------------------------------------------------------------ setup
+  /** Read the equipped outfit, hat and pet from the save. */
+  applyStyle() {
+    const st = store.data.style;
+    this.outfit = OUTFITS.find(o => o.id === st.outfit) || OUTFITS[0];
+    this.hat = HATS.find(o => o.id === st.hat) || HATS[0];
+    this.pet = st.pet !== 'none' ? PETS.find(o => o.id === st.pet) : null;
+    this.skin = SKINS.find(k => k.id === store.data.skins.equipped) || SKINS[0];
+  }
+
   clear() {
     this.fruits = []; this.arrows = []; this.pieces = []; this.particles = [];
     this.texts = []; this.decals = []; this.rings = []; this.orbs = [];
@@ -73,7 +83,8 @@ export class Game {
     this.shake = 0; this.hitstop = 0; this.slowmo = 0; this.flash = 0; this.flashColor = '#fff'; this.zoom = 0;
     this.time = 0; this.endT = 0; this.bossQueue = 0; this.bossCount = 0; this.won = false; this.goalSaid = false;
     this.wind = 0; this.windTarget = 0; this.windT = 3; this.twang = 9; this.drawTick = 0;
-    this.run = { shots: 0, hits: 0, fruits: 0, perfects: 0, coins: 0, skewer: 0, skewers: 0, bosses: 0, fevers: 0 };
+    this.run = { shots: 0, hits: 0, fruits: 0, perfects: 0, coins: 0, skewer: 0, skewers: 0, bosses: 0, fevers: 0, skill: 0, book: {} };
+    this.petUsed = false; this.petHop = 0; this.petSad = 0; this.clock = 0; this.pace = []; this.event = null; this.ghost = null;
     this.comboPulse = 0; this.scorePulse = 0;
     this.rnd = Math.random;
   }
@@ -217,15 +228,16 @@ export class Game {
 
   // ------------------------------------------------------------------ lifecycle
   /** mode: classic | survival | precision | daily | stage | tutorial. `stage` is a STAGES entry. */
-  start(mode, stage = null) {
-    this.clear();
+  start(mode, stage = null, eventId = null) {
+    this.clear(); this.applyStyle();
+    this.event = mode === 'event' ? EVENTS.find(e => e.id === eventId) || EVENTS[0] : null;
     this.mode = mode; this.state = 'playing'; this.stage = stage;
     const head = store.up('head');
     const df = this.diff = diffById(mode === 'daily' || mode === 'tutorial' ? 'moderate' : store.data.settings.diff);
     this.revived = false; this.offerDone = false;
     this.rule = mode === 'tutorial' ? 'none' : mode === 'survival' ? 'lives' : mode === 'precision' || (stage && stage.arrows) ? 'arrows' : 'time';
     this.lives = Math.max(1, 3 + df.lives) + head;
-    this.timeLeft = Math.round((stage ? stage.time : 60) * df.time) + head * 5;
+    this.timeLeft = Math.round((stage ? stage.time : this.event ? this.event.time : 60) * df.time) + head * 5;
     this.arrowsLeft = Math.round((stage ? stage.arrows : 15) * df.arrows) + head * 2;
     this.skin = SKINS.find(s => s.id === store.data.skins.equipped) || SKINS[0];
     this.arrowDef = ARROWS.find(a => a.id === store.data.arrows.equipped) || ARROWS[0];
@@ -240,16 +252,30 @@ export class Game {
     this.say(t('ready'), stage ? this.goalLabel() : t('readySub'), '#fff6e0', 1.4);
     if (this.modOn('shield')) this.addShields();
     if (stage && stage.boss >= 0) this.bossQueue = 1.6;
+    if (this.evt('rush')) this.bossQueue = 1.6;
+    this.ghost = mode === 'classic' && store.data.ghost.length ? store.data.ghost : null;
   }
   pause() { if (this.state === 'playing') { this.state = 'paused'; this.aim.active = false; } }
   resume() { if (this.state === 'paused') { this.state = 'playing'; this.last = performance.now(); } }
-  toMenu() { this.clear(); this.state = 'attract'; this.setTheme(1); audio.setIntense(false); }
+  toMenu() { this.clear(); this.applyStyle(); this.state = 'attract'; this.setTheme(1); audio.setIntense(false); }
+  evt(id) { return !!this.event && this.event.id === id && this.state !== 'attract'; }
+  /** Score lead (+) or deficit (-) against the best Time Attack run at this second. */
+  get ghostDelta() { if (!this.ghost) return null; const g = this.ghost; return this.score - (g[Math.min(g.length - 1, Math.floor(this.clock))] || 0); }
+  /** The pet shrugs off the first penalty of a run. */
+  petSave(x, y) {
+    if (!this.pet || this.petUsed || this.mode === 'tutorial') return false;
+    this.petUsed = true; this.petHop = 1;
+    this.text(x ?? this.bx, y ?? this.H - 190, this.pet.name.toUpperCase() + ' SAVED YOU!', '#a6f06a', 22);
+    this.sparkle(this.bx + 58, this.H - 60, '#a6f06a', 14); this.snd('power'); buzz('success');
+    return true;
+  }
   get live() { return this.state === 'playing' || this.state === 'ending'; }
   snd(n, a) { if (this.live) sfx(n, a); }
   get comboMult() { return Math.min(6, 1 + Math.floor(this.combo / 5) * 0.5); }
   get inFever() { return this.feverTime > 0; }
   modOn(m) {
     if (this.state === 'attract' || this.mode === 'tutorial') return false;
+    if (m === 'wind' && this.evt('storm')) return true;
     return this.stage ? this.stage.mods.includes(m) : this.level >= MOD_LEVEL[m] - this.diff.early;
   }
 
@@ -269,7 +295,7 @@ export class Game {
   // ------------------------------------------------------------------ spawning
   chooseKind() {
     const lucky = 1 + store.up('lucky') * 0.1, playing = this.state === 'playing';
-    const r = this.rnd(), storm = this.stage && this.stage.mods.includes('bombs');
+    const r = this.rnd(), storm = (this.stage && this.stage.mods.includes('bombs')) || this.evt('bombs');
     if (playing && (this.level >= 2 || storm) && !this.inFever && r < (storm ? 0.3 : Math.min(0.2, 0.05 + this.level * 0.018)) * this.diff.bomb) return 'bomb';
     const r2 = this.rnd();
     if (playing && this.level >= 3 && r2 < 0.012 * lucky) return 'gem';
@@ -284,7 +310,7 @@ export class Game {
     else def = SPECIALS[kind];
     const big = this.W > 560 ? 1.12 : 1;
     return {
-      kind, def, img: this.img[def.id], r: def.r * big, hp: def.hp || 1,
+      kind, def, img: this.img[def.id], r: def.r * big * (kind === 'fruit' && this.evt('giant') ? 1.45 : 1), hp: def.hp || 1,
       x: 0, y: 0, vx: 0, vy: 0, g: FRUIT_G, rot: rand(0, TAU), vr: rand(-2.4, 2.4), flash: 0, seen: false, t: rand(0, 6), age: 0,
       dodge: kind === 'fruit' && this.modOn('dodge') && this.rnd() < 0.22,
     };
@@ -358,7 +384,7 @@ export class Game {
     this.bossCount++;
     const def = BOSSES[idx], hp = Math.max(4, Math.round((this.stage ? 10 + (this.stage.tier ?? this.stage.world) * 5 : 8 + this.bossCount * 4) * this.diff.boss));
     this.boss = { def, x: this.W / 2, tx: this.W / 2, y: -90, r: def.r, hp, max: hp, t: 0, flash: 0, bombT: 3, life: this.stage ? 1e9 : 30, img: this.img[def.img] };
-    this.say(def.name + '!', t('bossSub'), '#ff8a1f', 2);
+    this.say(def.name + '!', BOSS_LINES[idx] ? '"' + BOSS_LINES[idx].taunt + '"' : t('bossSub'), '#ff8a1f', 2.6);
     this.snd('boss'); buzz('heavy'); this.shake = 14;
   }
 
@@ -474,6 +500,8 @@ export class Game {
 
   loseLife(x) {
     if (this.state !== 'playing') return;
+    if (this.petSave(x, this.H - 190)) return;
+    this.petSad = 1;
     this.lives--; this.combo = 0;
     this.flash = 0.45; this.flashColor = '#ff2d55'; this.shake = Math.max(this.shake, 10);
     this.snd('hurt'); buzz('error');
@@ -534,7 +562,19 @@ export class Game {
     }
     if (this.tut) { this.tut.any = true; if (perfect) this.tut.perfect = true; if (skew >= 2) this.tut.skew = true; if (f.kind === 'star') this.tut.star = true; }
     this.bumpCombo(perfect);
-    this.run.hits++; this.run.fruits++;
+    this.run.hits++; this.run.fruits++; this.petHop = 1;
+    if (f.kind === 'fruit') this.run.book[def.id] = (this.run.book[def.id] || 0) + 1;
+    // named skill shots: far away, saved at the last moment, or dead centre on a dodger
+    if (arrow && !arrow.volley.auto && !this.tut) {
+      const far = Math.hypot(f.x - this.bx, f.y - this.by) > this.H * 0.74;
+      const name = far ? 'LONG SHOT' : f.vy > 60 && f.y > this.H * 0.7 && !f.hover ? 'CLOSE SAVE' : f.dodge && perfect ? 'TRICK SHOT' : null;
+      if (name) {
+        this.run.skill++; this.score += Math.round(30 * this.diff.score);
+        this.text(f.x, f.y - 76 - (skew > 1 ? 26 : 0), name + '!', '#5ce1ff', 21);
+        this.rings.push({ x: f.x, y: f.y, r: f.r, max: f.r * 3.2, life: 0, color: '#5ce1ff', w: 4 });
+        this.snd('star');
+      }
+    }
     if (perfect) {
       this.run.perfects++;
       this.rings.push({ x: f.x, y: f.y, r: f.r * 0.6, max: f.r * 2.6, life: 0, color: '#ffe14d', w: 5 });
@@ -572,6 +612,8 @@ export class Game {
     if (this.tut) { this.tut.bomb = true; this.say('BOOM!', null, '#ff5c7a', 0.8); return; }
     this.say('BOOM!', t(this.rule === 'time' ? 'pen_time' : this.rule === 'lives' ? 'pen_life' : 'pen_arrows'), '#ff5c7a', 1);
     if (this.rule === 'lives') return this.loseLife();
+    if (this.petSave()) return;
+    this.petSad = 1;
     if (this.rule === 'time') this.timeLeft = Math.max(0, this.timeLeft - 8); else this.arrowsLeft = Math.max(0, this.arrowsLeft - 2);
     this.flash = 0.45; this.flashColor = '#ff2d55'; buzz('error');
   }
@@ -591,6 +633,8 @@ export class Game {
   killBoss() {
     const b = this.boss; this.boss = null;
     this.run.bosses++; this.wind = this.windTarget = 0;
+    this.run.book[b.def.id] = (this.run.book[b.def.id] || 0) + 1;
+    if (this.evt('rush')) this.bossQueue = 2.2;
     const pts = 500 * (this.effects.double > 0 ? 2 : 1) * (this.inFever ? 2 : 1);
     this.score += pts; this.scorePulse = 1;
     this.text(b.x, b.y - 84, '+' + pts, '#ffd23f', 40);
@@ -703,11 +747,17 @@ export class Game {
     s.games++; s.fruits += r.fruits; s.perfects += r.perfects; s.bosses += r.bosses; s.fevers += r.fevers;
     s.shots += r.shots; s.hits += r.hits; s.coinsEarned += coins;
     s.bestCombo = Math.max(s.bestCombo, this.maxCombo); s.bestSkewer = Math.max(s.bestSkewer, r.skewer);
-    const season = applyRun({ fruits: r.fruits, perfects: r.perfects, skewers: r.skewers, bosses: r.bosses, fevers: r.fevers, stars: newStars, games: 1, score: this.score });
+    const season = applyRun({ fruits: r.fruits, perfects: r.perfects, skewers: r.skewers, bosses: r.bosses, fevers: r.fevers, stars: newStars, games: 1, score: this.score, skill: r.skill, combo: this.maxCombo });
+    for (const k in r.book) d.book[k] = (d.book[k] || 0) + r.book[k];
+    s.skill = (s.skill || 0) + r.skill;
+    if (isBest && this.mode === 'classic') d.ghost = this.pace.slice();
+    this.eventChest = false;
+    if (this.mode === 'event') d.event.best = Math.max(d.event.best, this.score);
+    if (this.mode === 'event' && !d.event.played && this.score > 0) { d.event.played = true; d.chests++; this.eventChest = true; }
     store.save();
     if (isBest || stars > 0) this.confetti(stars === 3 || isBest ? 90 : 40);
     this.hooks.onGameOver({
-      diff: this.diff.id, revived: this.revived, mode: this.mode, stage: st, stars, newStars, won: this.won, score: this.score, best: Math.max(prevBest, this.score), prevBest, isBest, coins, season,
+      skill: r.skill, event: this.event, eventChest: this.eventChest, diff: this.diff.id, revived: this.revived, mode: this.mode, stage: st, stars, newStars, won: this.won, score: this.score, best: Math.max(prevBest, this.score), prevBest, isBest, coins, season,
       fruits: r.fruits, perfects: r.perfects, maxCombo: this.maxCombo, level: this.level, skewer: r.skewer,
       accuracy: r.shots ? Math.min(100, Math.round((r.hits / r.shots) * 100)) : 0,
     });
@@ -731,6 +781,7 @@ export class Game {
     this.shake = Math.max(0, this.shake - rdt * 46);
     this.zoom = Math.max(0, this.zoom - rdt * 5);
     this.twang += rdt;
+    this.petHop = Math.max(0, this.petHop - rdt * 2.6); this.petSad = Math.max(0, this.petSad - rdt * 0.8);
     if (this.announce && (this.announce.t += rdt) > this.announce.dur) this.announce = null;
     for (const c of this.clouds) { c.x += ((c.v + this.wind * 0.08) * rdt) / this.W; if (c.x > 1.25) { c.x = -0.25; c.y = rand(0.04, 0.42); } else if (c.x < -0.3) c.x = 1.2; }
     for (const l of this.leaves) {
@@ -755,6 +806,7 @@ export class Game {
         this.feverTime -= dt; this.fever = Math.max(0, this.feverTime / FEVER_TIME);
         if (this.feverTime <= 0) { this.fever = 0; audio.setIntense(false); }
       }
+      this.clock += dt; this.pace[Math.floor(this.clock)] = this.score;
       if (this.rule === 'time') {
         const before = Math.ceil(this.timeLeft);
         this.timeLeft -= dt;
@@ -1275,14 +1327,14 @@ export class Game {
     c.restore();
     // tunic
     c.fillStyle = OUT; c.beginPath(); c.roundRect(tx - 20, ty - 20 + breathe, 40, 40 - breathe, 14); c.fill();
-    c.fillStyle = '#2f9e44'; c.beginPath(); c.roundRect(tx - 17, ty - 17 + breathe, 34, 34 - breathe, 11); c.fill();
+    c.fillStyle = this.outfit.tunic; c.beginPath(); c.roundRect(tx - 17, ty - 17 + breathe, 34, 34 - breathe, 11); c.fill();
     c.fillStyle = '#5b3a1e'; c.fillRect(tx - 17, ty + 5, 34, 5);
     c.fillStyle = '#ffd23f'; c.fillRect(tx - 4, ty + 4, 8, 7);
     // head, hood and face
     c.fillStyle = OUT; c.beginPath(); c.arc(hx, hy, 19.5, 0, TAU); c.fill();
     c.fillStyle = '#f2c49b'; c.beginPath(); c.arc(hx, hy, 17, 0, TAU); c.fill();
     c.fillStyle = OUT; c.beginPath(); c.moveTo(hx - 21, hy - 1); c.quadraticCurveTo(hx - 20, hy - 26, hx + 4, hy - 23); c.lineTo(hx + 24, hy - 34); c.quadraticCurveTo(hx + 24, hy - 8, hx + 21, hy - 1); c.quadraticCurveTo(hx, hy - 12, hx - 21, hy - 1); c.fill();
-    c.fillStyle = '#237a35'; c.beginPath(); c.moveTo(hx - 18, hy - 4); c.quadraticCurveTo(hx - 17, hy - 23, hx + 4, hy - 20.5); c.lineTo(hx + 20, hy - 29); c.quadraticCurveTo(hx + 21, hy - 10, hx + 18, hy - 4); c.quadraticCurveTo(hx, hy - 14, hx - 18, hy - 4); c.fill();
+    c.fillStyle = this.outfit.hood; c.beginPath(); c.moveTo(hx - 18, hy - 4); c.quadraticCurveTo(hx - 17, hy - 23, hx + 4, hy - 20.5); c.lineTo(hx + 20, hy - 29); c.quadraticCurveTo(hx + 21, hy - 10, hx + 18, hy - 4); c.quadraticCurveTo(hx, hy - 14, hx - 18, hy - 4); c.fill();
     const blink = (this.time % 3.4) < 0.12, ex = ca * 2.6, ey = sa * 2.2;
     c.fillStyle = INK;
     for (const s of [-1, 1]) { c.beginPath(); c.ellipse(hx + s * 6.5 + ex, hy + 2 + ey, 2.6, blink ? 0.6 : a.active ? 2.2 : 3.2, 0, 0, TAU); c.fill(); }
@@ -1290,6 +1342,24 @@ export class Game {
     if (a.active) { c.moveTo(hx - 3 + ex, hy + 9.5); c.lineTo(hx + 3 + ex, hy + 9.5); } else c.arc(hx + ex, hy + 7, 4, 0.2, Math.PI - 0.2);
     c.stroke();
     c.fillStyle = 'rgba(255,120,120,0.35)'; for (const s of [-1, 1]) { c.beginPath(); c.arc(hx + s * 11, hy + 7, 3, 0, TAU); c.fill(); }
+
+    // hat
+    const hat = this.hat;
+    if (hat.id === 'feather') {
+      c.fillStyle = '#ff5470'; c.strokeStyle = INK; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(hx + 9, hy - 13); c.quadraticCurveTo(hx + 30, hy - 34, hx + 16, hy - 42); c.quadraticCurveTo(hx + 8, hy - 30, hx + 9, hy - 13); c.fill(); c.stroke();
+    } else if (hat.img && this.img[hat.img]) {
+      c.save(); c.translate(hx, hy - 24); c.rotate(-0.12); c.drawImage(this.img[hat.img], -17, -17, 34, 34); c.restore();
+    }
+    // pet companion: hops on hits, droops after a penalty, greys out once its save is used
+    if (this.pet && this.img[this.pet.icon]) {
+      const hop = Math.sin(this.petHop * Math.PI) * 16, sad = this.petSad > 0;
+      const px = bx + 62, py = this.H - 44 - hop + Math.sin(this.time * 2.4) * 1.5;
+      c.fillStyle = 'rgba(0,0,0,0.22)'; c.beginPath(); c.ellipse(px, this.H - 26, 15 - hop * 0.3, 4, 0, 0, TAU); c.fill();
+      c.save(); c.translate(px, py); c.rotate(sad ? 0.22 : Math.sin(this.time * 1.7) * 0.06);
+      c.globalAlpha = 1; c.drawImage(this.img[this.pet.icon], -18, -18, 36, 36); c.restore();
+      if (this.state === 'playing' && !this.petUsed) { c.fillStyle = '#a6f06a'; c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.arc(px + 15, py - 15, 5, 0, TAU); c.fill(); c.stroke(); }
+    }
 
     if (a.active && a.power > 0.03) this.drawGuide(c, angle, a.power);
 
@@ -1315,7 +1385,7 @@ export class Game {
     const arm = (sx, sy, ex2, ey2, bend) => {
       const mx = (sx + ex2) / 2 + bend, my = (sy + ey2) / 2 + 6;
       c.strokeStyle = OUT; c.lineWidth = 11; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(mx, my, ex2, ey2); c.stroke();
-      c.strokeStyle = '#2f9e44'; c.lineWidth = 7; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(mx, my, ex2, ey2); c.stroke();
+      c.strokeStyle = this.outfit.tunic; c.lineWidth = 7; c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(mx, my, ex2, ey2); c.stroke();
       c.fillStyle = OUT; c.beginPath(); c.arc(ex2, ey2, 7.5, 0, TAU); c.fill();
       c.fillStyle = '#f2c49b'; c.beginPath(); c.arc(ex2, ey2, 5.5, 0, TAU); c.fill();
     };

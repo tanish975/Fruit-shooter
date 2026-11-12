@@ -1,29 +1,24 @@
-# Fruit Archer v10.0.1
+# Fruit Archer v11.0.0
 
-Install `FruitArcher-v10.0.1.apk` on Android 7.0 or newer. If an earlier version is installed, uninstall it first (builds use a per-build debug key until signing secrets are added). To keep your progress, copy a backup code from Settings → Backup & restore before uninstalling and paste it in afterwards.
+Reasons to come back every day.
 
-The game stays in portrait: it is played one-handed with a thumb drag, and fruit flies upward, so a tall screen gives the most room to aim.
+## New
+- **Login calendar**: 28 days, a chest every 7th day, two on day 28. Streak freezes (150 coins, hold up to 2) cover missed days.
+- **Daily quests**: three a day, 40 coins each, plus a chest for finishing the set.
+- **Chests** with a reveal animation: coins, gems and sometimes a streak freeze. Earned from the calendar, quest sets, the first clear of every 5th stage and the weekend event.
+- **Archer style**: 6 outfits and 3 hats bought with gems (chests and season tiers).
+- **Pets**: fox, cat, dog or rabbit. A pet hops when you hit and cancels the first penalty of each run.
+- **Fruit Book**: every fruit and boss with hit counts and a fact.
+- **Weekend event** (Friday to Sunday, rotating weekly): Giant Harvest, Wind Storm, Bomb Squad or Boss Rush. First run pays a chest.
+- **Skill shots**: Long Shot, Close Save and Trick Shot give a callout and bonus points.
+- **Best-run ghost** in Time Attack: a pill shows how far ahead or behind your best run you are, second by second.
+- **Story**: an intro line per world, and each boss taunts you before the fight and concedes after it.
+- **"This week you…"** card on the home screen.
+- **Notification dots** on anything with something to collect or see.
+- **Daily reminder** notification (off by default, Settings).
+- New loading animation, breathing Play button, chest and claim effects.
 
-## Difficulty
-- Choose **Easy, Moderate, Hard or Intense** on first launch, from the chip on the home screen, or in Settings.
-- Difficulty changes fruit speed, wave spacing, bomb frequency, time/arrow/life limits, the length of the aiming guide, hit forgiveness, boss health and how early hazards appear. Hard scores count 1.3x and Intense 1.7x.
-- The Daily Challenge and training always run on Moderate.
-
-## Look and feel
-- **Four illustrated sceneries** (day, sunset, night, dawn) drawn in flat colours with mountains, hills and orchards. Pick one in Settings → Scenery or leave it on Auto. The photo backdrops from v10.0.0 were removed.
-- **Flat colours**: gradients were removed from the interface.
-- **New loading screen**: the logo drops in while an arrow flies along the progress bar.
-- **Celebrations**: spinning rays, a bouncing banner and confetti for stage clears, 3-star runs, boss kills and new best scores.
-- Body text is now set in Fredoka; headings stay in Lilita One.
-
-## New features
-- **Continue offer**: once per run, a failed stage or Survival run can be continued for coins (+15 seconds, +5 arrows or +1 life).
-- **Archer's tips**: after two fails on the same stage, the stage card and result screen show a hint for that goal.
-- **Trophy shelf** in Stats: 24 trophies for missions, bosses, perfect worlds, Endless Peaks and the season.
-- **Endless Peaks**: generated stages that continue after stage 40, ten at a time.
-- **Left-handed layout** and **aim sensitivity** (Low / Normal / High) in Settings.
-- **Hazard markers**: an optional ring-and-cross outline on bombs and birds that does not rely on colour.
-
-## Known limits
-- Not tested on a physical phone. Difficulty levels, the continue price and Endless Peaks scaling are untuned estimates.
-- See `ROADMAP.md` for what is deliberately parked (signing, balance pass, online leaderboard, Play Store).
+## Notes
+- Tested in a headless browser only, not on a phone. The reminder notification in particular is untested on a device.
+- Rewards and prices are first guesses and not yet balanced.
+- This build is debug-signed: uninstall the old version first. Use Settings → Backup & restore to keep progress.

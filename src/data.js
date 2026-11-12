@@ -203,3 +203,86 @@ export const DIFFS = [
     desc: 'Everything at once, almost no guide, one life fewer. Scores count 1.7x.' },
 ];
 export const diffById = id => DIFFS.find(d => d.id === id) || DIFFS[1];
+
+// ================= v11: things that bring players back =================
+
+// Daily quests: three are drawn each day. `key` is a per-run counter.
+export const QUESTS = [
+  { id: 'q_fruits', icon: 'apple', key: 'fruits', goal: 40, text: 'Hit {n} fruits' },
+  { id: 'q_perf', icon: 'target', key: 'perfects', goal: 8, text: 'Land {n} perfect hits' },
+  { id: 'q_skew', icon: 'cherries', key: 'skewers', goal: 4, text: 'Make {n} skewers' },
+  { id: 'q_games', icon: 'bow', key: 'games', goal: 3, text: 'Finish {n} runs' },
+  { id: 'q_score', icon: 'trophy', key: 'score', goal: 2000, text: 'Score {n} points in total' },
+  { id: 'q_fever', icon: 'bolt', key: 'fevers', goal: 2, text: 'Trigger Fever {n} times' },
+  { id: 'q_skill', icon: 'sparkles', key: 'skill', goal: 3, text: 'Pull off {n} skill shots' },
+];
+export const QUEST_COINS = 40;
+
+// 28-day login calendar. Every 7th day pays a chest; day 28 pays two.
+export const CAL_DAYS = 28;
+export const calReward = d => ({ coins: d === 28 ? 500 : d % 7 === 0 ? 150 : 30 + ((d - 1) % 7) * 10, chests: d === 28 ? 2 : d % 7 === 0 ? 1 : 0 });
+export const FREEZE_COST = 150;
+export const FREEZE_MAX = 2;
+
+// Archer style. Outfits and hats cost gems (from chests); pets cost coins.
+export const OUTFITS = [
+  { id: 'forest', name: 'Forest', cost: 0, tunic: '#2f9e44', hood: '#237a35' },
+  { id: 'crimson', name: 'Crimson', cost: 40, tunic: '#d7263d', hood: '#9b1b2c' },
+  { id: 'ocean', name: 'Ocean', cost: 40, tunic: '#2f7fd6', hood: '#1f5aa0' },
+  { id: 'sunny', name: 'Sunflower', cost: 60, tunic: '#f0a81f', hood: '#c47f0a' },
+  { id: 'royal', name: 'Royal', cost: 80, tunic: '#7a4fd6', hood: '#5632a8' },
+  { id: 'shadow', name: 'Shadow', cost: 100, tunic: '#3a3f4b', hood: '#22262e' },
+];
+export const HATS = [
+  { id: 'none', name: 'Hood only', cost: 0, icon: 'shirt' },
+  { id: 'feather', name: 'Red Feather', cost: 30, icon: 'leaf' },
+  { id: 'tophat', name: 'Top Hat', cost: 70, icon: 'hat', img: 'hat' },
+  { id: 'crown', name: 'Crown', cost: 120, icon: 'crown', img: 'crown' },
+];
+export const PETS = [
+  { id: 'none', name: 'No pet', cost: 0, icon: 'paw' },
+  { id: 'fox', name: 'Fox', cost: 800, icon: 'fox' },
+  { id: 'cat', name: 'Cat', cost: 800, icon: 'cat' },
+  { id: 'dog', name: 'Dog', cost: 800, icon: 'dog' },
+  { id: 'rabbit', name: 'Rabbit', cost: 1200, icon: 'rabbit' },
+];
+
+// Weekend events rotate week by week (open Friday to Sunday).
+export const EVENTS = [
+  { id: 'giant', name: 'Giant Harvest', desc: 'Every fruit is huge. 60 seconds of easy skewers.', time: 60 },
+  { id: 'storm', name: 'Wind Storm', desc: 'Strong wind the whole run. Lead your shots.', time: 60 },
+  { id: 'bombs', name: 'Bomb Squad', desc: 'Bombs everywhere. Thread the needle.', time: 60 },
+  { id: 'rush', name: 'Boss Rush', desc: 'One boss after another. How many can you smash in 90 seconds?', time: 90 },
+];
+
+// Story: one line per world, and a taunt and a parting line per boss.
+export const STORY = [
+  'The orchard is waking up, and something has been stealing the harvest.',
+  'The evening wind carries the thieves west. Follow the fruit.',
+  'Under the moon the grove fights back with shields and tricks.',
+  'The summit at dawn. Whoever rules the storm rules the harvest.',
+];
+export const BOSS_LINES = [
+  { taunt: 'This orchard is MINE, little archer!', defeat: 'Squashed... but the Golem will avenge me.' },
+  { taunt: 'Your arrows will bounce off my shell!', defeat: 'Cracked. The Queen is faster than you think.' },
+  { taunt: 'Catch me if you can, slowpoke!', defeat: 'Sliced! The Storm King will blow you away.' },
+  { taunt: 'I command the wind itself. Aim if you dare!', defeat: 'The harvest... is yours. Well shot, archer.' },
+];
+
+export const FACTS = {
+  apple: 'Apples float because about a quarter of their volume is air.',
+  orange: 'Oranges are a cross between a pomelo and a mandarin.',
+  watermelon: 'A watermelon is about 92% water.',
+  lemon: 'A lemon tree can carry flowers and fruit at the same time.',
+  pear: 'Pears ripen from the inside out.',
+  peach: 'Peaches and nectarines are the same species.',
+  banana: 'Botanically, a banana is a berry.',
+  mango: 'The mango is the national fruit of India.',
+  kiwi: 'Kiwifruit used to be called the Chinese gooseberry.',
+  grapes: 'Raisins are simply dried grapes.',
+  strawberry: 'Strawberries wear their seeds on the outside.',
+  pineapple: 'A pineapple plant takes more than a year to grow one fruit.',
+  cherries: 'Cherry trees belong to the rose family.',
+  blueberries: 'Blueberries are native to North America.',
+  coconut: 'A coconut is a drupe, not a true nut.',
+};
