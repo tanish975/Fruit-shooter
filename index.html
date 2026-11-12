@@ -1,1 +1,150 @@
-<!doctype html><html><body>placeholder</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b1036" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="description" content="Fruit Archer — pull back, aim and skewer flying fruit. A mobile arcade archery game." />
+  <link rel="icon" href="./icon-192.png" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <title>Fruit Archer</title>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- In-game HUD -->
+  <div id="hud" hidden>
+    <div class="hud-top">
+      <div class="pill" id="hudStat"><img id="hudStatIcon" alt="" /><span id="hudStatVal">60</span></div>
+      <div class="hud-score">
+        <div id="hudScore">0</div>
+        <div id="hudCombo" class="combo"><b id="hudComboN">0</b> COMBO <i id="hudComboX">x1</i></div>
+      </div>
+      <button class="round-btn" id="pauseBtn" aria-label="Pause"><span class="pause-ico"></span></button>
+    </div>
+    <div class="fever" id="feverWrap"><span class="fever-label">FEVER</span><div class="fever-track"><div class="fever-fill" id="feverFill"></div></div></div>
+    <div class="bossbar" id="bossBar" hidden><img id="bossIcon" alt="" /><div class="boss-track"><div class="boss-fill" id="bossFill"></div></div></div>
+    <div class="chips" id="chips"></div>
+    <div class="hud-level" id="hudLevel">LEVEL 1</div>
+  </div>
+
+  <!-- Home -->
+  <section class="screen" id="home" hidden>
+    <header class="topbar">
+      <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
+      <button class="round-btn" data-go="settings" aria-label="Settings"><img data-icon="gear" alt="" /></button>
+    </header>
+    <div class="logo rise">
+      <span class="logo-1">FRUIT</span>
+      <span class="logo-2">ARCHER</span>
+    </div>
+    <div class="home-bottom">
+      <div class="modes rise" id="modes"></div>
+      <p class="mode-desc rise" id="modeDesc"></p>
+      <button class="btn btn-play rise" id="playBtn">PLAY</button>
+      <nav class="nav rise">
+        <button class="nav-btn" data-go="shop"><img data-icon="cart" alt="" /><span>Shop</span></button>
+        <button class="nav-btn" data-go="missions"><img data-icon="trophy" alt="" /><span>Missions</span><em class="badge" id="missionBadge" hidden>0</em></button>
+        <button class="nav-btn" data-go="stats"><img data-icon="chart" alt="" /><span>Stats</span></button>
+      </nav>
+    </div>
+  </section>
+
+  <!-- Shop -->
+  <section class="screen sheet" id="shop" hidden>
+    <header class="topbar">
+      <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
+      <h2>Shop</h2>
+      <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
+    </header>
+    <div class="tabs rise"><button class="tab on" data-tab="upgrades">Upgrades</button><button class="tab" data-tab="bows">Bows</button></div>
+    <div class="list" id="shopList"></div>
+  </section>
+
+  <!-- Missions -->
+  <section class="screen sheet" id="missions" hidden>
+    <header class="topbar">
+      <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
+      <h2>Missions</h2>
+      <div class="pill coins"><img data-icon="coin" alt="" /><span class="coinCount">0</span></div>
+    </header>
+    <div class="list" id="missionList"></div>
+  </section>
+
+  <!-- Stats -->
+  <section class="screen sheet" id="stats" hidden>
+    <header class="topbar">
+      <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
+      <h2>Stats</h2>
+      <span class="spacer"></span>
+    </header>
+    <div class="list" id="statList"></div>
+  </section>
+
+  <!-- Settings -->
+  <section class="screen sheet" id="settings" hidden>
+    <header class="topbar">
+      <button class="round-btn" data-go="home" aria-label="Back"><span class="back-ico"></span></button>
+      <h2>Settings</h2>
+      <span class="spacer"></span>
+    </header>
+    <div class="list">
+      <div class="card rise toggles" id="toggles"></div>
+      <div class="card rise howto">
+        <h3>How to play</h3>
+        <ul>
+          <li><b>Drag down</b> anywhere, like a slingshot. The dotted guide shows the arrow's path.</li>
+          <li><b>Release</b> to shoot. Hit a fruit dead centre for a <b>PERFECT</b> (double points).</li>
+          <li>Arrows fly straight through fruit: line several up for a <b>SKEWER</b> multiplier.</li>
+          <li>Keep hitting to build your <b>combo</b> and fill the <b>FEVER</b> bar.</li>
+          <li>Never shoot the <b>bombs</b>. Do shoot the floating <b>power-up bubbles</b>.</li>
+        </ul>
+      </div>
+      <button class="btn btn-ghost rise" id="resetBtn">Reset all progress</button>
+      <p class="credits rise">Fruit Archer v<span id="ver"></span><br />Fruit art: Microsoft Fluent Emoji (MIT) · Motion: anime.js</p>
+    </div>
+  </section>
+
+  <!-- Pause -->
+  <section class="screen modal" id="pause" hidden>
+    <div class="panel">
+      <h2 class="rise">Paused</h2>
+      <div class="toggles rise" id="pauseToggles"></div>
+      <button class="btn btn-play rise" id="resumeBtn">RESUME</button>
+      <div class="row rise">
+        <button class="btn btn-alt" id="restartBtn">Restart</button>
+        <button class="btn btn-ghost" id="quitBtn">Quit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Game over -->
+  <section class="screen modal" id="over" hidden>
+    <div class="panel">
+      <div class="ribbon" id="bestRibbon" hidden>NEW BEST!</div>
+      <p class="over-mode rise" id="overMode"></p>
+      <div class="over-score rise" id="overScore">0</div>
+      <p class="over-best rise" id="overBest"></p>
+      <div class="grid rise" id="overGrid"></div>
+      <div class="earned rise"><img data-icon="coin" alt="" /><span id="overCoins">+0</span></div>
+      <p class="over-note rise" id="overNote" hidden></p>
+      <button class="btn btn-play rise" id="againBtn">PLAY AGAIN</button>
+      <div class="row rise">
+        <button class="btn btn-alt" id="overShop">Shop</button>
+        <button class="btn btn-ghost" id="overHome">Home</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Daily bonus / confirm -->
+  <section class="screen modal" id="dialog" hidden>
+    <div class="panel" id="dialogPanel"></div>
+  </section>
+
+  <div id="toast"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
